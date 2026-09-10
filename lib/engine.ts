@@ -6,10 +6,13 @@ import { SensorOverlay } from './sensor-overlay';
 import { ProgressiveSteering } from './steering';
 import { drivingInput, vehicleTelemetry, type VehicleTelemetry } from './telemetry';
 
-const MAX_FORWARD_SPEED = 40; // HUD scale: 200 km/h.
+import { stepVehicle } from './vehicle';
+import type { AgentFrame } from './rl/environment';
 
 export type RaceStats = {status:'ready'|'countdown'|'racing'|'paused'|'finished';speed:number;lap:number;time:number;best:number;countdown:number;offroad:boolean;rays:RayReading[];vehicle:VehicleTelemetry};
 export class RaceEngine {
+  private external = false;
+  private agentFrame: AgentFrame | null = null;
   private unregisterTools: () => void = () => {};
   private scene = new THREE.Scene();
   private camera = new THREE.OrthographicCamera(-60,60,42,-42,.1,300);
@@ -36,7 +39,7 @@ export class RaceEngine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
     this.renderer.setClearColor('#273c34');
     this.renderer.shadowMap.enabled=true;
-    this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type=THREE.PCFShadowMap;
     host.appendChild(this.renderer.domElement);
     this.renderer.domElement.setAttribute('aria-label','Top-down racing circuit with one orange car');
     this.points=sampleTrack(track);
@@ -108,34 +111,30 @@ export class RaceEngine {
     this.box(.24,.15,1.9,'#233337',-1.3,1.15,0,this.car);
   }
   private resize() {const w=this.host.clientWidth,h=this.host.clientHeight;if(!w||!h)return;this.renderer.setSize(w,h);const aspect=w/h,b=trackBounds(this.points,18),halfHeight=Math.max((b.maxZ-b.minZ)/2,(b.maxX-b.minX)/(2*aspect));this.camera.position.set((b.minX+b.maxX)/2,100,(b.minZ+b.maxZ)/2);this.camera.left=-halfHeight*aspect;this.camera.right=halfHeight*aspect;this.camera.top=halfHeight;this.camera.bottom=-halfHeight;this.camera.updateProjectionMatrix();}
-  private emit(){this.stats.vehicle=vehicleTelemetry(this.car.position,this.heading,this.keys,this.stats.status==='racing',this.steering.value);this.onStats({...this.stats});}
+  private emit(){this.stats.vehicle=this.external && this.agentFrame ? { ...this.agentFrame.controls, steering: this.agentFrame.steering, steeringWheelAngle: this.agentFrame.steering * 90, position: {x:this.agentFrame.x,z:this.agentFrame.z}, headingDegrees: ((this.agentFrame.heading*180/Math.PI)%360+360)%360 } : vehicleTelemetry(this.car.position,this.heading,this.keys,this.stats.status==='racing',this.steering.value);this.onStats({...this.stats});}
+  setExternal=(enabled:boolean)=>{this.external=enabled;this.agentFrame=null;this.reset();};
+  showAgent=(frame:AgentFrame)=>{if(!this.external)return;this.agentFrame=frame;this.car.position.set(frame.x,0,frame.z);this.heading=frame.heading;this.car.rotation.y=-frame.heading;this.stats.speed=frame.speed;this.stats.time=frame.time;this.stats.lap=frame.completed?1:0;this.stats.offroad=frame.offroad;this.stats.status='racing';this.updateSensors();this.emit();};
   reset=()=>{this.stats={status:'ready',speed:0,lap:0,time:0,best:0,countdown:3,offroad:false,rays:[],vehicle:vehicleTelemetry()};this.progress={previous:0,distance:0,laps:0};this.lapStart=0;this.keys.clear();this.placeAt(0);this.emit();};
-  start=()=>{this.reset();this.stats.status='countdown';this.countdownTime=3;this.emit();};
-  togglePause=()=>{if(this.stats.status==='racing')this.stats.status='paused';else if(this.stats.status==='paused')this.stats.status='racing';this.keys.clear();this.steering.reset();this.emit();};
-  setKey=(key:string,pressed:boolean)=>{if(pressed)this.keys.add(key);else this.keys.delete(key);};
+  start=()=>{if(this.external)return;this.reset();this.stats.status='countdown';this.countdownTime=3;this.emit();};
+  togglePause=()=>{if(this.external)return;if(this.stats.status==='racing')this.stats.status='paused';else if(this.stats.status==='paused')this.stats.status='racing';this.keys.clear();this.steering.reset();this.emit();};
+  setKey=(key:string,pressed:boolean)=>{if(this.external)return;if(pressed)this.keys.add(key);else this.keys.delete(key);};
   setRaysVisible=(visible:boolean)=>{this.sensorOverlay.group.visible=visible;};
   private updateSensors(){this.stats.rays=senseTrack(this.car.position,this.heading,this.edges);this.sensorOverlay.update(this.stats.rays);}
   private placeAt(index:number){const p=this.points[index],n=this.points[(index+1)%600];this.car.position.set(p.x,0,p.z);this.heading=Math.atan2(n.z-p.z,n.x-p.x);this.car.rotation.y=-this.heading;this.stats.speed=0;this.steering.reset();this.updateSensors();}
-  private keyDown=(e:KeyboardEvent)=>{if((e.target as HTMLElement)?.matches('input,textarea,select'))return;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Escape','r','R'].includes(e.key)){e.preventDefault();if(e.key==='Escape'&&!e.repeat)this.togglePause();else if(e.key.toLowerCase()==='r'&&!e.repeat&&this.stats.status==='racing')this.placeAt(this.progress.previous);else this.setKey(e.key,true);}};
+  private keyDown=(e:KeyboardEvent)=>{if(this.external)return;if((e.target as HTMLElement)?.matches('input,textarea,select'))return;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Escape','r','R'].includes(e.key)){e.preventDefault();if(e.key==='Escape'&&!e.repeat)this.togglePause();else if(e.key.toLowerCase()==='r'&&!e.repeat&&this.stats.status==='racing')this.placeAt(this.progress.previous);else this.setKey(e.key,true);}};
   private keyUp=(e:KeyboardEvent)=>{this.setKey(e.key,false);};
   private blur=()=>{this.keys.clear();if(this.stats.status==='racing')this.togglePause();};
   private visibility=()=>{if(document.hidden)this.blur();};
   private tick=(now:number)=>{
     const dt=Math.min((now-(this.last||now))/1000,.05);this.last=now;
     if(this.stats.status==='countdown'){this.countdownTime-=dt;this.stats.countdown=Math.ceil(this.countdownTime);if(this.countdownTime<=0)this.stats.status='racing';}
-    if(this.stats.status==='racing') {
+    if(!this.external&&this.stats.status==='racing') {
       this.stats.time+=dt;
       const near=nearestPoint(this.points,this.car.position.x,this.car.position.z);this.stats.offroad=near.distance>ROAD_WIDTH*this.roadScale/2;
       const input=drivingInput(this.keys,true);
-      const accelerating=input.accelerator,braking=input.brake;
-      let acceleration=accelerating?16:0;if(braking)acceleration-=this.stats.speed>0?30:10;
-      if(!accelerating&&!braking)this.stats.speed*=Math.exp(-1.1*dt);
-      this.stats.speed+=acceleration*dt;const maxSpeed=this.stats.offroad?7:MAX_FORWARD_SPEED;
-      this.stats.speed=THREE.MathUtils.clamp(this.stats.speed,-8,MAX_FORWARD_SPEED);if(this.stats.speed>maxSpeed)this.stats.speed=Math.max(maxSpeed,this.stats.speed-45*dt);
-      const steer=this.steering.update(input.steering,dt);
-      this.heading+=steer*1.85*Math.min(Math.abs(this.stats.speed)/7,1)*Math.sign(this.stats.speed)*dt;
-      this.car.position.x+=Math.cos(this.heading)*this.stats.speed*dt;this.car.position.z+=Math.sin(this.heading)*this.stats.speed*dt;
-      this.car.position.x=THREE.MathUtils.clamp(this.car.position.x,this.bounds.minX,this.bounds.maxX);this.car.position.z=THREE.MathUtils.clamp(this.car.position.z,this.bounds.minZ,this.bounds.maxZ);this.car.rotation.y=-this.heading;
+      const state={x:this.car.position.x,z:this.car.position.z,heading:this.heading,speed:this.stats.speed};
+      stepVehicle(state,input,this.steering,dt,this.stats.offroad,this.bounds);
+      this.heading=state.heading;this.stats.speed=state.speed;this.car.position.set(state.x,0,state.z);this.car.rotation.y=-this.heading;
       const next=nearestPoint(this.points,this.car.position.x,this.car.position.z);
       if(advanceProgress(this.progress,next.index,next.distance<=5.5*this.roadScale&&near.distance<=5.5*this.roadScale,600)) {const lapTime=this.stats.time-this.lapStart;this.lapStart=this.stats.time;this.stats.best=this.stats.best?Math.min(this.stats.best,lapTime):lapTime;this.stats.lap=this.progress.laps;if(this.stats.lap>=this.laps){this.stats.status='finished';this.stats.speed=0;this.keys.clear();this.steering.reset();}}
     }
