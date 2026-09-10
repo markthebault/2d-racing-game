@@ -3,8 +3,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { Flag, ArrowUpRight, RotateCcw, Pause, Play, ChevronLeft, ChevronRight, Trophy, Keyboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { TRACKS, trackCurve, formatTime } from '@/lib/race';
+import { TRACKS, trackCurve, trackBounds, formatTime } from '@/lib/race';
 import { RaceEngine, type RaceStats } from '@/lib/engine';
+import { SensorDebug } from '@/components/sensor-debug';
+import { vehicleTelemetry } from '@/lib/telemetry';
+
+const TRACK_PREVIEWS = TRACKS.map((_, index) => {
+  const points = trackCurve(index).getPoints(240);
+  const bounds = trackBounds(points, 8);
+  return {
+    viewBox: [bounds.minX, bounds.minZ, bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ].join(' '),
+    path: points.map((point, i) => (i ? 'L' : 'M') + point.x + ',' + point.z).join(' ') + ' Z',
+  };
+});
 
 export default function Home() {
   const host = useRef<HTMLDivElement>(null);
@@ -12,15 +23,18 @@ export default function Home() {
   const [track, setTrack] = useState(0);
   const [laps, setLaps] = useState(3);
   const [error,setError] = useState('');
-  const [stats,setStats] = useState<RaceStats>({status:'ready',speed:0,lap:0,time:0,best:0,countdown:3,offroad:false});
+  const [showRays,setShowRays] = useState(true);
+  const [debugOpen,setDebugOpen] = useState(true);
+  const [stats,setStats] = useState<RaceStats>({status:'ready',speed:0,lap:0,time:0,best:0,countdown:3,offroad:false,rays:[],vehicle:vehicleTelemetry()});
   useEffect(() => {
     if (!host.current) return;
     try { engine.current = new RaceEngine(host.current, track, laps, setStats); }
     catch { setError('The game needs WebGL. Try a browser with hardware acceleration enabled.'); }
     return () => { engine.current?.dispose(); engine.current=null; };
   },[track,laps]);
+  useEffect(() => { engine.current?.setRaysVisible(showRays); },[showRays,track,laps]);
   const running = stats.status !== 'ready' && stats.status !== 'finished';
-  return <main className="app-shell">
+  return <main className={"app-shell" + (debugOpen ? " debug-open" : "")}>
     <header className="topbar"><a className="brand" href="/" aria-label="Pocket Circuit home"><span className="brand-mark"><Flag size={21}/></span>POCKET<span>CIRCUIT</span><sup>01</sup></a><div className="top-note"><span className="live-dot"/> SINGLE PLAYER <span className="divider">/</span> TIME ATTACK</div></header>
     <div className="workspace">
       <aside className="setup">
@@ -28,7 +42,7 @@ export default function Home() {
         <p className="intro">Pick your circuit. Find your line.</p>
         <div className="section-label"><span>01 / SELECT CIRCUIT</span><span>3 TRACKS</span></div>
         <div className="tracks">{TRACKS.map((t,i) => <Button key={t.name} variant="ghost" disabled={running} className={`track-option ${track===i?'selected':''}`} onClick={()=>setTrack(i)} aria-pressed={track===i}>
-          <svg className="track-map" viewBox="-56 -36 112 72" aria-hidden="true"><path d={trackCurve(i).getPoints(80).map((p,j)=>`${j?'L':'M'}${p.x},${p.z}`).join(' ')+' Z'} fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin="round"/></svg>
+          <svg className="track-map" viewBox={TRACK_PREVIEWS[i].viewBox} aria-hidden="true"><path d={TRACK_PREVIEWS[i].path} fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin="round"/></svg>
           <span className="track-copy"><strong>{t.name}</strong><small>{t.kind}</small></span><span className="selection-dot"/>
         </Button>)}</div>
         <p className="track-description">{TRACKS[track].description}</p>
@@ -51,6 +65,8 @@ export default function Home() {
         </div>
         <div className="race-footer"><span><span className="car-dot"/> YOU / CAR 01 <span className="footer-hint">Follow the track clockwise.</span></span><div><Button variant="ghost" onClick={()=>engine.current?.reset()} aria-label="Reset race"><RotateCcw size={15}/> Reset</Button><Button variant="ghost" disabled={!running||stats.status==='countdown'} onClick={()=>engine.current?.togglePause()}><Pause size={15}/>{stats.status==='paused'?'Resume':'Pause'}</Button></div></div>
       </section>
-    </div><footer className="page-footer"><span>POCKET CIRCUIT</span><span>Just you, the road, and the clock.</span><span>BUILT FOR THE ARROW KEYS</span></footer>
+    </div>
+    <SensorDebug readings={stats.rays} vehicle={stats.vehicle} visible={showRays} onToggle={()=>setShowRays(value=>!value)} open={debugOpen} onOpenChange={setDebugOpen}/>
+    <footer className="page-footer"><span>POCKET CIRCUIT</span><span>Just you, the road, and the clock.</span><span>BUILT FOR THE ARROW KEYS</span></footer>
   </main>;
 }

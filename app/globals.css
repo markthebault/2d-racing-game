@@ -139,3 +139,51 @@ body {
 @media(max-width:1100px){.app-shell{padding:0 24px}.workspace{grid-template-columns:250px minmax(0,1fr);gap:24px}.hud{gap:18px;padding:12px}.hud strong{font-size:16px}.footer-hint{display:none}.setup h1{font-size:31px}.mode-tag{display:none}}
 @media(max-width:760px){.app-shell{padding:0 16px}.topbar{height:76px}.top-note{display:none}.workspace{display:flex;flex-direction:column;padding:24px 0;gap:24px}.setup h1{font-size:29px;margin:9px 0}.setup h1 br{display:none}.intro{margin-bottom:22px}.tracks{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.track-option{height:114px!important;flex-direction:column!important;gap:4px!important;padding:10px 4px!important}.track-copy{text-align:center;gap:3px}.track-copy strong{font-size:12px}.track-copy small{font-size:9px}.selection-dot{display:none}.track-description{min-height:0;margin:10px 0 16px}.controls{display:none}.lap-picker{margin-bottom:12px}.race-heading{padding:17px}.game-view{height:440px}.hud{left:12px;top:12px;max-width:calc(100% - 24px);gap:20px}.hud strong{font-size:15px}.hud small{font-size:9px}.page-footer span:last-child{display:none}.ready-label{bottom:90px;font-size:10px;padding:10px}.ready-label small{font-size:11px}.track-bottom{bottom:12px;left:12px;right:12px}.touch-controls{display:flex;position:absolute;bottom:13px;left:50%;transform:translateX(-50%);gap:5px}.touch-controls button{touch-action:none;background:#20382eed;border:1px solid #9dad91;color:#e0eccf;width:36px;height:40px;border-radius:5px;font-size:20px}.track-bottom>span{display:none}.race-footer{padding:9px 12px}.race-footer>div{gap:2px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+
+.sensor-debug { padding: 22px 24px; border-top: 1px solid #3b493e; background: #19251f; }
+.sensor-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.sensor-header h3 { margin: 5px 0 0; font-size: 21px; font-weight: 550; letter-spacing: -.4px; }
+.sensor-header button { min-height: 36px; }
+.sensor-debug p { color: #b9c7b1; font-size: 14px; line-height: 1.6; margin: 14px 0; }
+.sensor-legend { display: flex; flex-wrap: wrap; gap: 8px 20px; color: #b9c7b1; font-size: 12px; margin-bottom: 16px; }
+.sensor-table { font-family: var(--font-geist-mono), monospace; font-size: 13px; font-variant-numeric: tabular-nums; }
+.sensor-table th { color: #b9c7b1; font-size: 12px; }
+.sensor-table th, .sensor-table td { padding: 7px 10px; height: auto; }
+.sensor-table th:first-child, .sensor-table td:first-child { padding-left: 0; }
+.sensor-front, .sensor-table .sensor-front { color: #e2ff86; }
+.sensor-rear, .sensor-table .sensor-rear { color: #84dcff; }
+.sensor-table .sensor-rear-row { background: #1e2d29; }
+.sensor-normalized { display: flex; align-items: center; gap: 12px; }
+.sensor-bar { display: block; width: 70px; height: 4px; background: #3c4940; border-radius: 2px; overflow: hidden; }
+.sensor-bar > span { display: block; height: 100%; background: #e2ff86; }
+.sensor-rear-row .sensor-bar > span { background: #84dcff; }
+.sensor-debug .sensor-note { font-size: 12px; margin-bottom: 0; }
+@media(max-width:760px) { .sensor-debug { padding: 18px 14px; } .sensor-table th, .sensor-table td { padding: 7px; } .sensor-bar { display: none; } }
+
+.debug-dock { position: fixed; right: 20px; top: 112px; z-index: 40; max-width: calc(100vw - 24px); border: 1px solid #4c5c4d; border-radius: 10px; background: #19251f; box-shadow: 0 12px 35px #101c1970; overflow: hidden; }
+.debug-dock.is-open { width: 450px; }
+.debug-fold { display: flex; align-items: center; gap: 9px; width: 100%; padding: 14px 16px; color: #daef8c; background: #263629; border: 0; font-size: 14px; font-weight: 600; text-align: left; }
+.debug-fold small { margin-left: auto; color: #bbc9b2; font-size: 12px; font-weight: 400; }
+.debug-content { max-height: calc(100dvh - 180px); overflow-y: auto; overscroll-behavior: contain; scrollbar-color: #65775f #19251f; }
+.debug-dock .sensor-debug { padding: 18px; }
+.debug-dock .sensor-header h3 { font-size: 19px; }
+.debug-dock .sensor-header { gap: 8px; }
+.debug-dock .sensor-bar { display: none; }
+.debug-dock .sensor-table th, .debug-dock .sensor-table td { padding: 7px 5px; }
+.pedal-readings { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+.pedal-readings label { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 7px; font-size: 13px; color: #bdcbb5; }
+.pedal-readings strong { font-family: var(--font-geist-mono), monospace; color: #edf1e9; }
+.pedal-readings meter { width: 100%; height: 14px; accent-color: #daef8c; }
+.pedal-readings meter::-webkit-meter-bar { background: #3c4940; border: 0; }
+.pedal-readings meter::-webkit-meter-optimum-value { background: #daef8c; }
+.pedal-readings meter::-moz-meter-bar { background: #daef8c; }
+.vehicle-readings { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+.vehicle-readings dt { color: #b9c7b1; font-size: 12px; margin-bottom: 4px; }
+.vehicle-readings dd { margin: 0; font: 18px var(--font-geist-mono), monospace; font-variant-numeric: tabular-nums; }
+.steering-reading { display: flex; gap: 16px; align-items: center; padding: 12px 0; border-top: 1px solid #3b493e; }
+.steering-reading svg { color: #daef8c; }
+.steering-reading span { display: block; color: #b9c7b1; font-size: 12px; }
+.steering-reading strong { display: block; margin-top: 4px; font: 18px var(--font-geist-mono), monospace; }
+.steering-reading small { color: #bdcbb5; font-size: 12px; }
+@media(min-width:1300px) { .app-shell.debug-open { max-width: 2000px; padding-right: 494px; } .debug-open .workspace { gap: 24px; grid-template-columns: 250px minmax(0,1fr); } .debug-open .footer-hint, .debug-open .mode-tag { display: none; } .debug-open .hud { gap: 16px; padding: 12px; } .debug-open .hud strong { font-size: 16px; } }
+@media(max-width:760px) { .debug-dock { right: 12px; top: 12px; } .debug-content { max-height: calc(100dvh - 88px); } }
