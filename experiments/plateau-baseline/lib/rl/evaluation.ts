@@ -2,7 +2,7 @@ import { DEFAULT_MIN_DISTANCE } from './motion.ts';
 import { DrivingEnvironment, type StartPose } from './environment.ts';
 import type { Preset } from './config.ts';
 
-export const EVALUATION_VERSION = 5;
+export const EVALUATION_VERSION = 3;
 // Identical cases for every seed and experiment; independent of the training RNG.
 export const EVALUATION_STARTS: readonly (StartPose & { name: string })[] = [
   { name: 'Start line', fraction: 0, offset: 0, heading: 0 },
@@ -11,7 +11,7 @@ export const EVALUATION_STARTS: readonly (StartPose & { name: string })[] = [
   { name: 'One-third around', fraction: 1 / 3, offset: -.4, heading: .06 },
   { name: 'Two-thirds around', fraction: 2 / 3, offset: .4, heading: -.06 },
 ];
-export type EvaluationRun = { name: string; score: number; progress: number; completed: boolean; time: number; offroadTime: number; reason: string; terminalSpeed?: number; terminalOffset?: number; terminalArc?: number };
+export type EvaluationRun = { name: string; score: number; progress: number; completed: boolean; time: number; offroadTime: number; reason: string };
 export type EvaluationSummary = { version: number; minDistance: number; targetLaps: number; track: number; runs: EvaluationRun[]; successRate: number; meanScore: number; meanProgress: number; meanOffroadTime: number; meanLapTime: number | null };
 export function summarizeEvaluation(track: number, runs: EvaluationRun[], targetLaps = 1, minDistance = DEFAULT_MIN_DISTANCE): EvaluationSummary {
   if (runs.length !== EVALUATION_STARTS.length) throw new Error('Evaluation must include every start case.');
@@ -39,7 +39,7 @@ export class EvaluationSuite {
     const env = this.environment;
     env.step(act(env.observe()));
     if (env.done) {
-      this.runs.push({ name: this.label, score: env.score, progress: env.frame().progress, completed: env.completed, time: env.time, offroadTime: env.totalOffroadTime, reason: env.reason, terminalSpeed: env.state.speed, terminalOffset: env.project().offset / env.halfWidth, terminalArc: env.project().arc / env.length });
+      this.runs.push({ name: this.label, score: env.score, progress: env.frame().progress, completed: env.completed, time: env.time, offroadTime: env.totalOffroadTime, reason: env.reason });
       this.index++;
       if (!this.done) env.reset(EVALUATION_STARTS[this.index]);
     }

@@ -3,7 +3,6 @@ export const DEFAULT_MIN_DISTANCE = 1;
 export class MotionWindow {
   private positions: { x: number; z: number }[] = [];
   distance: number | null = null;
-  get fraction() { return Math.min(1, Math.max(0, this.positions.length - 1) / 60); }
   reset(position: { x: number; z: number }) { this.positions = [{ x: position.x, z: position.z }]; this.distance = null; }
   step(position: { x: number; z: number }) {
     this.positions.push({ x: position.x, z: position.z });

@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advanceProgress, sampleTrack, trackCurve, nearestPoint, formatTime } from '../lib/race.ts';
+import { TRACKS, advanceProgress, sampleTrack, trackCurve, nearestPoint, formatTime } from '../lib/race.ts';
 
-test('all three tracks close, have usable road width, and project positions correctly',()=>{
-  for(let track=0;track<3;track++) {
+test('all five tracks close, have usable road width, and project positions correctly',()=>{
+  for(let track=0;track<TRACKS.length;track++) {
     const points=sampleTrack(track);
     assert.equal(points.length,600);
     assert.ok(points[0].distanceTo(points[599]) <= trackCurve(track).getLength() / 600 * 1.01);

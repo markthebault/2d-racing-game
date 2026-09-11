@@ -281,3 +281,20 @@ body {
 .evaluation-metrics .training-metrics { border-color:#507078; }
 .evaluation-metrics details,.comparison-results details { margin-top:14px; font-size:13px; }
 .evaluation-metrics td,.evaluation-metrics th,.comparison-results td,.comparison-results th { font-size:12px; padding:8px 5px; }
+
+.training-plan { border:1px solid #52644e; border-radius:8px; padding:14px; margin:0 0 16px; display:grid; gap:12px; min-width:0; }
+.training-plan legend { padding:0 6px; color:#daef8c; font-weight:600; }
+.training-plan label { display:flex; align-items:center; gap:10px; font-size:14px; cursor:pointer; }
+.training-plan input { width:18px; height:18px; accent-color:#daef8c; flex-shrink:0; }
+.training-plan small { color:#b7c4b0; line-height:1.5; font-size:13px; }
+.training-track-choices { display:grid; gap:8px; }
+.training-track-choices label { background:#24342a; padding:8px 10px; border-radius:5px; }
+.training-track-choices span { display:flex; justify-content:space-between; gap:8px; width:100%; }
+.training-track-choices small { font-size:11px; }
+.training-track-results { margin:16px 0; display:grid; gap:8px; }
+.training-track-results>div { border:1px solid #435442; border-radius:6px; padding:10px; display:grid; gap:4px; font-size:14px; }
+.training-track-results small { color:#b7c4b0; }
+@media(max-width:760px) { .tracks { grid-template-columns:repeat(2,minmax(0,1fr)); } .track-copy strong { white-space:normal; font-size:14px; } }
+
+.chart-filter { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:14px 0; font-size:14px; }
+.chart-filter select { max-width:100%; background:#24342a; color:#e8efe2; border:1px solid #52644e; padding:8px; border-radius:6px; }

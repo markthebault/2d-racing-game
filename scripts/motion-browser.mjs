@@ -10,7 +10,8 @@ try{
  await page.getByRole('button',{name:'Train AI',exact:true}).click();await wait(()=>window.stats?.status==='ready');
  const control=page.getByLabel('Minimum movement / 1 s',{exact:true});assert.equal(await control.inputValue(),'1');
  await page.locator('.training-actions select').first().selectOption('0');
- await page.getByRole('button',{name:'Start training',exact:true}).click();await wait(()=>window.stats?.steps>280&&window.stats?.best);
+ await page.getByLabel('Guided warm-up before RL',{exact:true}).uncheck();
+  await page.getByRole('button',{name:'Start training',exact:true}).click();await wait(()=>window.stats?.steps>280&&window.stats?.best);
  await page.getByRole('button',{name:'Pause all',exact:true}).click();await wait(()=>window.stats.status==='paused');
  const before=await page.evaluate(()=>window.stats);
  await control.selectOption('2');await wait(()=>window.stats.minDistance===2&&window.stats.status==='ready');

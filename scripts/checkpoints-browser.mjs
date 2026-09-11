@@ -13,9 +13,15 @@ try{
   await page.goto(process.env.RACING_URL||'http://100.90.198.2:8088/');
   await page.getByRole('button',{name:'Train AI',exact:true}).click();
   await wait(()=>window.rlStats?.status==='ready'&&window.rlStats.targetLaps===3);
+  // Preserve this script's single-track regression coverage; multitrack-browser covers the new default.
+  await page.getByLabel('Train across three tracks',{exact:true}).uncheck();
+  await page.getByLabel('Mix in starts around the circuit',{exact:true}).uncheck();
+  await page.getByRole('button',{name:'Apply training setup',exact:true}).click();
+  await wait(()=>window.rlStats.status==='ready'&&window.rlStats.trainingTracks.length===1);
   assert.equal(await page.evaluate(()=>window.rlStats.checkpointCount),4);
   assert.equal(await page.getByLabel('Number of laps').isDisabled(),false);
   await page.locator('.training-actions select').first().selectOption('0');
+  await page.getByLabel('Guided warm-up before RL',{exact:true}).uncheck();
   await page.getByRole('button',{name:'Start training',exact:true}).click();
   await wait(()=>window.rlStats?.best?.evaluation);
   await page.locator('.train-button').click();await wait(()=>window.rlStats?.status==='paused');

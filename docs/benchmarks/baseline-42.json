@@ -1,0 +1,298 @@
+{
+  "seed": 42,
+  "budget": 60000,
+  "episode": 697,
+  "seconds": 512.194,
+  "results": [
+    {
+      "version": 3,
+      "minDistance": 1,
+      "targetLaps": 3,
+      "track": 0,
+      "runs": [
+        {
+          "name": "Start line",
+          "score": 8230.650000000003,
+          "progress": 1,
+          "completed": true,
+          "time": 19.350000000000183,
+          "offroadTime": 0,
+          "reason": "Race complete"
+        },
+        {
+          "name": "Start line · left",
+          "score": 8230.1,
+          "progress": 1,
+          "completed": true,
+          "time": 19.90000000000015,
+          "offroadTime": 0,
+          "reason": "Race complete"
+        },
+        {
+          "name": "Start line · right",
+          "score": 8230.116666666663,
+          "progress": 1,
+          "completed": true,
+          "time": 19.883333333333486,
+          "offroadTime": 0,
+          "reason": "Race complete"
+        },
+        {
+          "name": "One-third around",
+          "score": 8229.933333333336,
+          "progress": 1,
+          "completed": true,
+          "time": 20.06666666666681,
+          "offroadTime": 0,
+          "reason": "Race complete"
+        },
+        {
+          "name": "Two-thirds around",
+          "score": 8230.433333333334,
+          "progress": 1,
+          "completed": true,
+          "time": 19.566666666666837,
+          "offroadTime": 0,
+          "reason": "Race complete"
+        }
+      ],
+      "successRate": 1,
+      "meanScore": 8230.246666666668,
+      "meanProgress": 1,
+      "meanOffroadTime": 0,
+      "meanLapTime": 6.584444444444498
+    },
+    {
+      "version": 3,
+      "minDistance": 1,
+      "targetLaps": 3,
+      "track": 1,
+      "runs": [
+        {
+          "name": "Start line",
+          "score": 3281.3696027006486,
+          "progress": 0.5028235271262135,
+          "completed": false,
+          "time": 33.31666666666606,
+          "offroadTime": 1.0000000000000013,
+          "reason": "Left the track"
+        },
+        {
+          "name": "Start line · left",
+          "score": 4209.912890888801,
+          "progress": 0.7524109179395201,
+          "completed": false,
+          "time": 49.099999999998495,
+          "offroadTime": 0,
+          "reason": "Stuck: insufficient movement over 1 second"
+        },
+        {
+          "name": "Start line · right",
+          "score": 8166.5833333332575,
+          "progress": 1,
+          "completed": true,
+          "time": 83.41666666666322,
+          "offroadTime": 0,
+          "reason": "Race complete"
+        },
+        {
+          "name": "One-third around",
+          "score": 3601.7163092413903,
+          "progress": 0.7287628041072834,
+          "completed": false,
+          "time": 45.4999999999987,
+          "offroadTime": 1.183333333333334,
+          "reason": "Left the track"
+        },
+        {
+          "name": "Two-thirds around",
+          "score": 8142.199999999926,
+          "progress": 1,
+          "completed": true,
+          "time": 84.46666666666316,
+          "offroadTime": 0.4666666666666666,
+          "reason": "Race complete"
+        }
+      ],
+      "successRate": 0.4,
+      "meanScore": 5480.356427232805,
+      "meanProgress": 0.7967994498346034,
+      "meanOffroadTime": 0.5300000000000005,
+      "meanLapTime": 27.9805555555544
+    },
+    {
+      "version": 3,
+      "minDistance": 1,
+      "targetLaps": 3,
+      "track": 2,
+      "runs": [
+        {
+          "name": "Start line",
+          "score": 2315.0000000001223,
+          "progress": 1,
+          "completed": false,
+          "time": 270.0000000000831,
+          "offroadTime": 3.7999999999999914,
+          "reason": "Time limit"
+        },
+        {
+          "name": "Start line · left",
+          "score": 353.4914506126193,
+          "progress": 0.18262582990190487,
+          "completed": false,
+          "time": 26.583333333333105,
+          "offroadTime": 1.1166666666666676,
+          "reason": "Left the track"
+        },
+        {
+          "name": "Start line · right",
+          "score": 328.3888630341659,
+          "progress": 0.18324690208925912,
+          "completed": false,
+          "time": 27.249999999999734,
+          "offroadTime": 1.6333333333333324,
+          "reason": "Left the track"
+        },
+        {
+          "name": "One-third around",
+          "score": 2139.2770628314997,
+          "progress": 0.6414120945772469,
+          "completed": false,
+          "time": 94.61666666666258,
+          "offroadTime": 2.1833333333333305,
+          "reason": "Stuck: insufficient movement over 1 second"
+        },
+        {
+          "name": "Two-thirds around",
+          "score": 1816.3345773346098,
+          "progress": 0.9743042565931606,
+          "completed": false,
+          "time": 131.68333333333027,
+          "offroadTime": 2.883333333333328,
+          "reason": "Left the track"
+        }
+      ],
+      "successRate": 0,
+      "meanScore": 1390.4983907626033,
+      "meanProgress": 0.5963178166323143,
+      "meanOffroadTime": 2.3233333333333297,
+      "meanLapTime": null
+    },
+    {
+      "version": 3,
+      "minDistance": 1,
+      "targetLaps": 3,
+      "track": 3,
+      "runs": [
+        {
+          "name": "Start line",
+          "score": 8169.916666666624,
+          "progress": 1,
+          "completed": true,
+          "time": 47.583333333331915,
+          "offroadTime": 0.6500000000000004,
+          "reason": "Race complete"
+        },
+        {
+          "name": "Start line · left",
+          "score": 8215.016666666672,
+          "progress": 1,
+          "completed": true,
+          "time": 34.98333333333263,
+          "offroadTime": 0,
+          "reason": "Race complete"
+        },
+        {
+          "name": "Start line · right",
+          "score": 8214.816666666664,
+          "progress": 1,
+          "completed": true,
+          "time": 35.18333333333262,
+          "offroadTime": 0,
+          "reason": "Race complete"
+        },
+        {
+          "name": "One-third around",
+          "score": 8216.18333333333,
+          "progress": 1,
+          "completed": true,
+          "time": 33.81666666666603,
+          "offroadTime": 0,
+          "reason": "Race complete"
+        },
+        {
+          "name": "Two-thirds around",
+          "score": 8215.566666666671,
+          "progress": 1,
+          "completed": true,
+          "time": 34.43333333333266,
+          "offroadTime": 0,
+          "reason": "Race complete"
+        }
+      ],
+      "successRate": 1,
+      "meanScore": 8206.299999999992,
+      "meanProgress": 1,
+      "meanOffroadTime": 0.13000000000000006,
+      "meanLapTime": 12.399999999999723
+    },
+    {
+      "version": 3,
+      "minDistance": 1,
+      "targetLaps": 3,
+      "track": 4,
+      "runs": [
+        {
+          "name": "Start line",
+          "score": 8119.399999999894,
+          "progress": 1,
+          "completed": true,
+          "time": 114.76666666666144,
+          "offroadTime": 0.31666666666666665,
+          "reason": "Race complete"
+        },
+        {
+          "name": "Start line · left",
+          "score": 8139.183333333238,
+          "progress": 1,
+          "completed": true,
+          "time": 110.81666666666166,
+          "offroadTime": 0,
+          "reason": "Race complete"
+        },
+        {
+          "name": "Start line · right",
+          "score": 8136.699999999901,
+          "progress": 1,
+          "completed": true,
+          "time": 113.29999999999485,
+          "offroadTime": 0,
+          "reason": "Race complete"
+        },
+        {
+          "name": "One-third around",
+          "score": 8135.683333333232,
+          "progress": 1,
+          "completed": true,
+          "time": 114.31666666666146,
+          "offroadTime": 0,
+          "reason": "Race complete"
+        },
+        {
+          "name": "Two-thirds around",
+          "score": 8134.049999999906,
+          "progress": 1,
+          "completed": true,
+          "time": 115.9499999999947,
+          "offroadTime": 0,
+          "reason": "Race complete"
+        }
+      ],
+      "successRate": 1,
+      "meanScore": 8133.003333333235,
+      "meanProgress": 1,
+      "meanOffroadTime": 0.06333333333333332,
+      "meanLapTime": 37.9433333333316
+    }
+  ]
+}

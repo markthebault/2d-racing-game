@@ -1,0 +1,10 @@
+import { chromium } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+const browser=await chromium.launch({args:['--no-sandbox']});
+const page=await browser.newPage({viewport:{width:1200,height:1260},deviceScaleFactor:1});
+const names=['Park oval','Pine bend','Desert switchback','Coastal sweep','Slate canyon'];
+const images=await Promise.all(names.map(async(name,i)=>`<figure><figcaption>${name}</figcaption><img src="data:image/png;base64,${(await readFile(`/tmp/circuit-${i}.png`)).toString('base64')}"></figure>`));
+await page.setContent(`<style>body{margin:0;padding:12px;background:#151c1b;color:#edf1e9;font:20px sans-serif;display:grid;grid-template-columns:1fr 1fr;gap:12px}figure{margin:0}figcaption{padding:8px}img{width:100%;height:355px;object-fit:contain}</style>${images.join('')}`);
+await page.locator('img').evaluateAll(images=>Promise.all(images.map(img=>img.decode())));
+const screenshot=await page.screenshot({path:'/tmp/five-circuits.jpg',type:'jpeg',quality:85});
+console.log(screenshot.toString('base64'));await browser.close();

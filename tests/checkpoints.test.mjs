@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DrivingEnvironment } from '../lib/rl/environment.ts';
-import { CHECKPOINT_COUNTS, OBSERVATION_SIZE } from '../lib/rl/config.ts';
+import { CHECKPOINT_COUNTS, OBSERVATION_SIZE, OBSERVATION_VERSION } from '../lib/rl/config.ts';
 import { EvaluationSuite, summarizeEvaluation, EVALUATION_STARTS, betterEvaluation } from '../lib/rl/evaluation.ts';
 import { DQNAgent, initializeTensorflow } from '../lib/rl/agent.ts';
 import { migrateModel } from '../lib/rl/models.ts';
@@ -15,7 +15,7 @@ function driveAt(env, arc, direction=1) {
   env.time=0;env.stalledTime=0;env.step(4);
 }
 test('three-lap races award each checkpoint once per lap on all circuits',()=>{
-  for(let track=0;track<3;track++) {
+  for(let track=0;track<CHECKPOINT_COUNTS.length;track++) {
     const env=new DrivingEnvironment(track,'local',false,3);
     let checkpointTotal=0,finishTotal=0,events=0,lastLap=0;
     for(let arc=0;arc<env.length*3+1&&!env.done;arc+=.75){
@@ -47,7 +47,7 @@ test('jumping to an unearned checkpoint does not award it',()=>{
 test('lap targets extend time budget, enter observations, and constrain evaluation ranking',()=>{
   assert.throws(()=>new DrivingEnvironment(0,'local',false,0));assert.throws(()=>new DrivingEnvironment(0,'local',false,2.5));
   const env=new DrivingEnvironment(0,'local',false,3);env.time=90;env.step(1);assert.equal(env.done,false);
-  assert.equal(env.observe().at(-1),.3);env.time=270;env.step(1);assert.equal(env.reason,'Time limit');
+  assert.equal(env.observe()[35],.3);env.time=270;env.step(1);assert.equal(env.reason,'Time limit');
   const suite=new EvaluationSuite(0,'local',3);assert.equal(suite.environment.targetLaps,3);
   const runs=EVALUATION_STARTS.map(s=>({name:s.name,score:6000,progress:1,completed:true,time:60,offroadTime:0,reason:'Race complete'}));
   const result=summarizeEvaluation(0,runs,3);assert.equal(result.meanLapTime,20);assert.equal(result.targetLaps,3);
@@ -60,7 +60,7 @@ test('34-input saved models retain learned rows and gain zero-weight lap inputs'
     const saved={version:2,observationVersion:2,id:'old',track:0,preset:'local',seed:42,episode:50,trainedTracks:[0],parentId:null,evaluation:{version:1},weights};
     const original=JSON.stringify(saved),model=migrateModel(saved);
     assert.deepEqual(model.weights[0].values.slice(0,34*64),weights[0].values);assert.ok(model.weights[0].values.slice(34*64).every(v=>v===0));
-    assert.equal(model.evaluation,null);assert.equal(model.observationVersion,3);agent.loadWeights(model.weights);
+    assert.equal(model.evaluation,null);assert.equal(model.observationVersion,OBSERVATION_VERSION);agent.loadWeights(model.weights);
     assert.equal(JSON.stringify(saved),original);
   }finally{agent.dispose();}
 });

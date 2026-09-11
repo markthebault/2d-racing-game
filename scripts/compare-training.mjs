@@ -6,9 +6,9 @@ import {EvaluationSuite} from '../lib/rl/evaluation.ts';
 import {COMPARISON_SEEDS,PRESETS} from '../lib/rl/config.ts';
 await initializeTensorflow();
 const budget=Number(process.argv[2]||100),track=Number(process.argv[3]||0),output=process.argv[4];
-if(!Number.isInteger(budget)||budget<1||budget>5000||![0,1,2].includes(track))throw new Error('Usage: compare-training.mjs <episodes 1–5000> <track 0–2> [output.json]');
+if(!Number.isInteger(budget)||budget<1||budget>5000||![0,1,2,3,4].includes(track))throw new Error('Usage: compare-training.mjs <episodes 1–5000> <track 0–4> [output.json]');
 const rows=[];
-for(const preset of Object.keys(PRESETS))for(const seed of COMPARISON_SEEDS){
+for(const preset of Object.keys(PRESETS).filter(preset=>preset!=='adaptive'))for(const seed of COMPARISON_SEEDS){
   const agent=new DQNAgent(seed),env=new DrivingEnvironment(track,preset);
   try{
     for(let episode=1;episode<=budget;episode++){

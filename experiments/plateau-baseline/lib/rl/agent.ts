@@ -2,7 +2,7 @@ import * as tf from '@tensorflow/tfjs';
 import { ACTIONS, OBSERVATION_SIZE } from './environment.ts';
 
 export type Weights = { shape: number[]; values: number[] }[];
-export type Experience = { track?: number; state: number[]; action: number; reward: number; next: number[]; done: boolean; discount?: number };
+export type Experience = { track?: number; state: number[]; action: number; reward: number; next: number[]; done: boolean };
 export function seededRandom(seed = 42) {
   return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let n = Math.imul(seed ^ seed >>> 15, 1 | seed); n ^= n + Math.imul(n ^ n >>> 7, 61 | n); return ((n ^ n >>> 14) >>> 0) / 4294967296; };
 }
@@ -15,24 +15,17 @@ function network(seed: number) {
   return model;
 }
 export class DQNAgent {
-  advanced: boolean;
-  lessons: { state: number[]; action: number }[] = [];
   readonly online: tf.Sequential;
   readonly target: tf.Sequential;
   readonly optimizer = tf.train.adam(.0005);
   readonly random: () => number;
   replay: Experience[] = [];
   private cursor = 0;
-  private pending: Experience[] = [];
-  private explorationRestart = 0;
-  discardPending() { this.pending = []; }
-  renewExploration() { this.explorationRestart = this.steps; }
-
   private trainingTracks: number[] = [];
   private buckets = new Map<number, { items: Experience[]; slots: number[]; cursor: number }>();
   setTrainingTracks(tracks: number[]) {
     const existing = this.replay;
-    this.trainingTracks = [...tracks]; this.clearReplay(); this.renewExploration();
+    this.trainingTracks = [...tracks]; this.clearReplay();
     if (!tracks.length) { this.replay = existing; this.cursor = existing.length % 20000; return; }
     for (const item of existing) if (item.track !== undefined && tracks.includes(item.track)) this.store(item);
   }
@@ -50,32 +43,25 @@ export class DQNAgent {
   updates = 0;
   steps = 0;
   loss: number | null = null;
-  constructor(seed = 42, advanced = false) {
-    this.advanced = advanced;
+  constructor(seed = 42) {
     this.random = seededRandom(seed); this.online = network(seed); this.target = network(seed + 10);
     this.target.setWeights(this.online.getWeights());
   }
-  clearReplay() { this.replay = []; this.cursor = 0; this.buckets.clear(); this.discardPending(); }
-  get epsilon() { if(this.lessons.length) return Math.max(.04,.15*Math.exp(-this.steps/20000)); if(!this.advanced) return Math.max(.04,Math.exp(-this.steps/16000)); return Math.max(.08, Math.exp(-this.steps / 40000), .3 * Math.exp(-(this.steps-this.explorationRestart)/8000)); }
+  clearReplay() { this.replay = []; this.cursor = 0; this.buckets.clear(); }
+  get epsilon() { return Math.max(.04, Math.exp(-this.steps / 16000)); }
   act(state: number[], explore = false) {
     if (explore && this.random() < this.epsilon) {
       // Favor movement when exploring. Uniform braking at rest otherwise fills memory with stationary failures.
-      const pedal = this.random(), bank = pedal < (this.advanced ? .55 : .7) ? 0 : pedal < (this.advanced ? .8 : .9) ? 1 : 2;
+      const pedal = this.random(), bank = pedal < .7 ? 0 : pedal < .9 ? 1 : 2;
       return bank * 3 + Math.floor(this.random() * 3);
     }
     return tf.tidy(() => (this.online.predict(tf.tensor2d([state])) as tf.Tensor2D).argMax(1).dataSync()[0]);
   }
   remember(experience: Experience) {
-    if(!this.advanced) { this.steps++; if(this.trainingTracks.length) this.store(experience); else { this.replay[this.cursor]=experience;this.cursor=(this.cursor+1)%20000; } return; }
-    if (this.pending.length && this.pending[0].track !== experience.track) this.discardPending();
-    this.steps++; this.pending.push(experience);
-    while (this.pending.length >= 3 || (experience.done && this.pending.length)) {
-      const sequence=this.pending.slice(0,3), last=sequence[sequence.length-1];
-      const item={...this.pending[0], reward:sequence.reduce((sum,e,i)=>sum+Math.pow(.995,i)*e.reward,0), next:last.next, done:last.done, discount:Math.pow(.995,sequence.length)};
-      if (this.trainingTracks.length) this.store(item);
-      else { this.replay[this.cursor]=item; this.cursor=(this.cursor+1)%20000; }
-      this.pending.shift();
+    if (this.trainingTracks.length) {
+      this.store(experience); this.steps++; return;
     }
+    this.replay[this.cursor] = experience; this.cursor = (this.cursor + 1) % 20000; this.steps++;
   }
   train() {
     if (this.replay.length < 256 || this.steps % 4 !== 0) return this.loss;
@@ -84,37 +70,22 @@ export class DQNAgent {
       const pool = buckets.length ? buckets[Math.floor(this.random() * buckets.length)].items : this.replay;
       return pool[Math.floor(this.random() * pool.length)];
     });
-    const demonstrations=this.lessons.length ? Array.from({length:16},()=>this.lessons[Math.floor(this.random()*this.lessons.length)]) : [];
     const loss = tf.tidy(() => {
       const states = tf.tensor2d(batch.map(e => e.state)), next = tf.tensor2d(batch.map(e => e.next));
       const actions = tf.oneHot(tf.tensor1d(batch.map(e => e.action), 'int32'), ACTIONS.length);
       // Double DQN: online chooses the next action; the delayed target values it.
       const bestNext = (this.online.predict(next) as tf.Tensor2D).argMax(1);
       const future = (this.target.predict(next) as tf.Tensor2D).mul(tf.oneHot(bestNext, ACTIONS.length)).sum(1);
-      const target = tf.tensor1d(batch.map(e => e.reward * .01)).add(future.mul(tf.tensor1d(batch.map(e => e.done ? 0 : e.discount ?? .995))));
-      const objective = () => {
+      const target = tf.tensor1d(batch.map(e => e.reward * .01)).add(future.mul(tf.tensor1d(batch.map(e => e.done ? 0 : .995))));
+      const cost = this.optimizer.minimize(() => {
         const prediction = (this.online.apply(states) as tf.Tensor2D).mul(actions).sum(1);
-        let loss=tf.losses.huberLoss(target, prediction).mean();
-        if(demonstrations.length) {
-          const labels=tf.oneHot(tf.tensor1d(demonstrations.map(row=>row.action),'int32'),ACTIONS.length);
-          const q=this.online.apply(tf.tensor2d(demonstrations.map(row=>row.state))) as tf.Tensor2D;
-          // Keep useful demonstrated decisions while TD values adapt to driving rewards.
-          const imitation=tf.losses.softmaxCrossEntropy(labels,q).mean();
-          loss=loss.add(imitation.mul(5));
-        }
-        return loss as tf.Scalar;
-      };
-      if(!this.advanced) return this.optimizer.minimize(objective,true)!.dataSync()[0];
-      const { value: cost, grads } = this.optimizer.computeGradients(objective);
-      const norm=tf.addN(Object.values(grads).map(gradient=>gradient.square().sum())).sqrt();
-      const scale=tf.minimum(1,tf.div(5,norm.add(1e-8)));
-      this.optimizer.applyGradients(Object.fromEntries(Object.entries(grads).map(([name,gradient])=>[name,gradient.mul(scale)])));
-      return cost.dataSync()[0];
+        return tf.losses.huberLoss(target, prediction).mean() as tf.Scalar;
+      }, true);
+      return cost!.dataSync()[0];
     });
     if (!Number.isFinite(loss)) throw new Error('Training became unstable. Start a new training session.');
     this.loss = loss; this.updates++;
-    if(!this.advanced) { if(this.updates%200===0)this.target.setWeights(this.online.getWeights()); }
-    else tf.tidy(()=>{ const online=this.online.getWeights(); this.target.setWeights(this.target.getWeights().map((weight,i)=>weight.mul(.995).add(online[i].mul(.005)))); });
+    if (this.updates % 200 === 0) this.target.setWeights(this.online.getWeights());
     return loss;
   }
   exportWeights(): Weights { return this.online.getWeights().map(t => ({ shape: [...t.shape], values: Array.from(t.dataSync()) })); }

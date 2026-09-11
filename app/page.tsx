@@ -47,7 +47,7 @@ export default function Home() {
         <div className="eyebrow">THE PADDOCK</div><h1>Small car.<br/>Big lap energy.</h1>
         <p className="intro">Pick your circuit. Find your line.</p>
         <div className="driver-mode" role="group" aria-label="Driver mode"><Button variant="ghost" aria-pressed={!learning} onClick={()=>setLearning(false)}>Manual drive</Button><Button variant="ghost" aria-pressed={learning} onClick={()=>{setLearning(true);setDebugOpen(false);}}>Train AI</Button></div>
-        <div className="section-label"><span>01 / SELECT CIRCUIT</span><span>3 TRACKS</span></div>
+        <div className="section-label"><span>01 / SELECT CIRCUIT</span><span>{TRACKS.length} TRACKS</span></div>
         <div className="tracks">{TRACKS.map((t,i) => <Button key={t.name} variant="ghost" disabled={running&&!learning} className={`track-option ${track===i?'selected':''}`} onClick={()=>setTrack(i)} aria-pressed={track===i}>
           <svg className="track-map" viewBox={TRACK_PREVIEWS[i].viewBox} aria-hidden="true"><path d={TRACK_PREVIEWS[i].path} fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin="round"/></svg>
           <span className="track-copy"><strong>{t.name}</strong><small>{t.kind}</small></span><span className="selection-dot"/>
@@ -62,7 +62,7 @@ export default function Home() {
         <div className="race-heading"><div><span className="eyebrow">CIRCUIT 0{track+1}</span><h2>{TRACKS[track].name}</h2></div><span className="mode-tag">{learning?'AI DRIVING LAB':stats.status==='ready'?'READY TO RACE':stats.status==='finished'?'CHECKERED FLAG':'TIME ATTACK'}</span></div>
         <div className="game-view"><div ref={host} className="canvas-host"/>
           {(!learning || singlePlayback) && <div className="hud"><div><small>LAP</small><strong>{Math.min(stats.lap+1,laps)}<em> / {laps}</em></strong></div><div><small>RACE TIME</small><strong>{formatTime(stats.time)}</strong></div><div><small>BEST LAP</small><strong>{stats.best?formatTime(stats.best):'--:--.--'}</strong></div></div>}
-          {learning&&!singlePlayback&&<div className="fleet-caption">{fleet&&fleet.track===track ? `EPISODES ${fleet.first}–${fleet.last} · ${fleet.poses.filter(p=>!p.done).length}/50 DRIVING · ${fleet.time.toFixed(1)} s · ${fleet.speed}× REPLAY` : 'LEARNING LAB · Cars appear together after each group of 50 attempts'}</div>}
+          {learning&&!singlePlayback&&<div className="fleet-caption">{fleet&&fleet.track===track ? `EPISODES ${fleet.first}–${fleet.last} · ${fleet.poses.filter(p=>!p.done).length}/${fleet.poses.length} DRIVING · ${fleet.time.toFixed(1)} s · ${fleet.speed}× REPLAY` : 'LEARNING LAB · Cars appear together after each group of 50 attempts'}</div>}
           {!learning&&stats.status==='ready'&&<div className="ready-label"><span className="live-dot"/> ON THE GRID <small>Choose your laps, then start your engine.</small></div>}
           {!learning&&stats.status==='countdown'&&<div className="countdown" aria-live="assertive">{stats.countdown}</div>}
           {!learning&&stats.status==='paused'&&<div className="game-overlay"><h3>Taking a pit stop.</h3><Button className="start-button" onClick={()=>engine.current?.togglePause()}><Play/> Resume race</Button></div>}

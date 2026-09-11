@@ -108,15 +108,15 @@ export class RaceEngine {
     let seed=31+this.track*117;const random=()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646;};
     for(let i=0;i<115;i++) {const x=this.bounds.minX-10+random()*(this.bounds.maxX-this.bounds.minX+20),z=this.bounds.minZ-10+random()*(this.bounds.maxZ-this.bounds.minZ+20);if(nearestPoint(this.points,x,z).distance<9||Math.hypot(x,z)<9)continue;
       const size=1+random()*1.3;
-      if(this.track===2){const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(size,0),new THREE.MeshStandardMaterial({color:i%2?'#d6b986':'#95734f',roughness:1}));rock.position.set(x,.8,z);rock.scale.y=.65;rock.castShadow=true;this.scene.add(rock);}
+      if(this.track===2||this.track===4){const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(size,0),new THREE.MeshStandardMaterial({color:this.track===4?(i%2?'#a8a9ba':'#777887'):(i%2?'#d6b986':'#95734f'),roughness:1}));rock.position.set(x,.8,z);rock.scale.y=.65;rock.castShadow=true;this.scene.add(rock);}
       else {this.box(.45,2,.45,'#615840',x,.8,z);const tree=new THREE.Mesh(new THREE.ConeGeometry(size,3+size,7),new THREE.MeshStandardMaterial({color:i%3?'#274f3d':'#3c6444',roughness:1}));tree.position.set(x,2.6,z);tree.castShadow=true;this.scene.add(tree);}
     }
     // Keep the grandstand clear of the technical circuits' infield return leg.
-    const standOffset=this.track===0?0:22.4;
+    const standOffset=this.track===0?0:22.4, standX=this.track===4?-43:0;
     // Small grandstand in the infield.
-    for(let row=0;row<3;row++)this.box(14,.65+row*.3,1.25,'#bcc6b8',-2,.25+row*.15,standOffset-3-row*1.4);
-    this.box(15,.25,5.4,'#243e38',-2,3.4,standOffset-4.4);
-    for(const x of [-8,4])this.box(.24,3.5,.24,'#d0d4c4',x,1.5,standOffset-4.4);
+    for(let row=0;row<3;row++)this.box(14,.65+row*.3,1.25,'#bcc6b8',standX-2,.25+row*.15,standOffset-3-row*1.4);
+    this.box(15,.25,5.4,'#243e38',standX-2,3.4,standOffset-4.4);
+    for(const x of [-8,4])this.box(.24,3.5,.24,'#d0d4c4',standX+x,1.5,standOffset-4.4);
     // Trackside start marker.
     this.box(.3,2,.3,'#f4ecdb',start.x,.9,start.z+7.2);
     this.box(3,.12,1.4,'#f4ecdb',start.x+1.3,2,start.z+7.2);

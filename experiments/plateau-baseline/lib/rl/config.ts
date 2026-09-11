@@ -1,10 +1,9 @@
-export const OBSERVATION_VERSION = 4;
-export const OBSERVATION_SIZE = 52;
+export const OBSERVATION_VERSION = 3;
+export const OBSERVATION_SIZE = 36;
 export const PRESETS = {
   baseline: { label: '1 · Corrected baseline', speedBonus: true, normalizedProgress: false, absolutePosition: true },
   'no-speed': { label: '2 · Remove speed bonus', speedBonus: false, normalizedProgress: false, absolutePosition: true },
   normalized: { label: '3 · Normalize progress', speedBonus: false, normalizedProgress: true, absolutePosition: true },
-  adaptive: { label: '5 · Corner rewards (experimental)', speedBonus: false, normalizedProgress: true, absolutePosition: false },
   local: { label: '4 · Local inputs', speedBonus: false, normalizedProgress: true, absolutePosition: false },
 } as const;
 export type Preset = keyof typeof PRESETS;

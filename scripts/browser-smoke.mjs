@@ -25,9 +25,15 @@ try {
   await page.goto(process.env.RACING_URL||'http://100.90.198.2:8088/');
   await page.getByRole('button',{name:'Train AI',exact:true}).click();
   await wait(()=>window.__rlStats?.status==='ready');
+  // Preserve this script's single-track regression coverage; multitrack-browser covers the new default.
+  await page.getByLabel('Train across three tracks',{exact:true}).uncheck();
+  await page.getByLabel('Mix in starts around the circuit',{exact:true}).uncheck();
+  await page.getByRole('button',{name:'Apply training setup',exact:true}).click();
+  await wait(()=>window.__rlStats.status==='ready'&&window.__rlStats.trainingTracks.length===1);
   const layout=await page.evaluate(()=>({track:document.querySelector('.track-option').getBoundingClientRect().right,canvas:document.querySelector('.race-panel').getBoundingClientRect().left}));
   assert.ok(layout.track<layout.canvas,'Circuit buttons fit beside the canvas');
   await page.locator('.training-actions select').first().selectOption('0');
+  await page.getByLabel('Guided warm-up before RL',{exact:true}).uncheck();
   await page.getByRole('button',{name:'Start training',exact:true}).click();
   await wait(()=>window.__rlStats?.episode>=10);
   console.log('Browser: first 10 episodes trained without individual car frames.');
@@ -84,6 +90,7 @@ try {
   await page.locator('.model-library select').first().selectOption(sourceKey);
   await page.getByRole('button',{name:'Load on Desert switchback',exact:true}).click();
   await wait(()=>window.__rlStats?.track===2&&window.__rlStats?.steps===0&&window.__rlStats?.status==='ready');
+  await page.getByLabel('Guided warm-up before RL',{exact:true}).uncheck();
   await page.getByRole('button',{name:'Start training',exact:true}).click();
   await wait(()=>window.__rlStats?.steps>0);
   assert.equal(await page.evaluate(key=>localStorage.getItem(key),sourceKey),originalSave,'Loading and fine-tuning retains the source save');
