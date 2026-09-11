@@ -1,3 +1,4 @@
+import { configureFeatures, currentFeatures } from './features.ts';
 import { DecisionLab } from './decision-lab.ts';
 import type { DecisionReading } from './insights.ts';
 import { DrivingCoach } from './coach.ts';
@@ -91,7 +92,7 @@ function switchTrack(track: number, laps = targetLaps, threshold = minDistance, 
   agent.discardPending(); agent.renewExploration(); environments.clear(); attempt = 0; resetAttempt();
   evaluation = null; pausedMode = 'idle'; paused = false; clearBatch();
   parentId = best?.id ?? parentId; modelId = id();
-  best = { version: MODEL_VERSION, observationVersion: OBSERVATION_VERSION, guided: guidedUsed, id: modelId, parentId, track, preset: stats.preset, seed: stats.seed,
+  best = { features: currentFeatures(), version: MODEL_VERSION, observationVersion: OBSERVATION_VERSION, guided: guidedUsed, id: modelId, parentId, track, preset: stats.preset, seed: stats.seed,
     episode: stats.episode, trainedTracks: [...trainedTracks], evaluation: null, evaluations: [], weights: agent.exportWeights() };
   bestAgent.loadWeights(best.weights); summaryOfBest(); stats.evaluation = null; stats.evaluations = []; stats.validation = null; stats.milestones = [];
   beginEvaluation(true, resume ? 'train' : 'idle');
@@ -161,7 +162,7 @@ function finishEvaluation() {
     best!.evaluation = result; best!.evaluations = [...evaluationResults]; summaryOfBest();
     send({ type: 'checkpoint', checkpoint: best! });
   } else if (betterAcrossTracks(evaluationResults, best?.evaluations ?? (best?.evaluation ? [best.evaluation] : []))) {
-    best = { version: MODEL_VERSION, observationVersion: OBSERVATION_VERSION, guided: guidedUsed, id: modelId, track: environment.track, preset: stats.preset,
+    best = { features: currentFeatures(), version: MODEL_VERSION, observationVersion: OBSERVATION_VERSION, guided: guidedUsed, id: modelId, track: environment.track, preset: stats.preset,
       seed: stats.seed, episode: stats.episode, trainedTracks: [...trainedTracks], parentId,
       evaluation: result, evaluations: [...evaluationResults], weights: agent.exportWeights() };
     bestAgent.loadWeights(best.weights); summaryOfBest(); send({ type: 'checkpoint', checkpoint: best });
@@ -276,6 +277,7 @@ self.onmessage = async (event: MessageEvent<WorkerCommand>) => {
       const saved = command.checkpoint ? migrateModel(command.checkpoint) : null;
       const preset = saved?.preset ?? command.preset ?? DEFAULT_PRESET, seed = saved?.seed ?? command.seed ?? 42;
       if (!Number.isInteger(seed) || seed < 0 || seed > 2147483647) throw new Error('Use an integer seed between 0 and 2147483647.');
+      configureFeatures(saved?.features ?? command.features);
       coachEnabled=command.coach??false;
       trainingTracks = validateTrainingTracks(command.trainingTracks ?? [command.track]); variedStarts = command.variedStarts ?? false;
       targetLaps = command.laps ?? 1; setupRun(command.track, preset, seed);
@@ -310,6 +312,16 @@ self.onmessage = async (event: MessageEvent<WorkerCommand>) => {
     else if (initialized && command.type === 'motion') switchTrack(viewTrack, targetLaps, command.minDistance);
     else if (command.type === 'track') { if (!Number.isInteger(command.track) || !TRACKS[command.track]) return; if (!initialized) { pendingTrack = command.track; pendingLaps = command.laps ?? null; } else switchTrack(command.track, command.laps ?? targetLaps); }
     else if (initialized && command.type === 'skip-replay' && display === 'batch') { finishBatch(); publish(); }
+    else if (initialized && command.type === 'restart-playback' && display !== 'none') {
+      if (display === 'play') {
+        playback!.reset(); stats.lastPlayback = null; nextPlayback = performance.now() + 100; show();
+      } else {
+        batchTime = 0; lastDisplay = performance.now();
+        send({ type: 'fleet', frame: sampleBatch(activeRuns, 0, viewTrack, replaySpeed) });
+      }
+      stats.message = paused ? 'Playback reset to the start. Resume when ready.' : 'Playback restarted. Learned weights and training progress are retained.';
+      publish();
+    }
     else if (initialized && command.type === 'pause') {
       if (!paused) pausedMode = display !== 'none' ? display : mode;
       paused = true; stats.status = 'paused'; stats.message = 'Training and playback paused. Resume retains both positions and all learned experience.'; publish();
@@ -318,7 +330,7 @@ self.onmessage = async (event: MessageEvent<WorkerCommand>) => {
       paused = false; pausedMode = 'idle'; lastDisplay = performance.now(); nextPlayback = performance.now(); nextTrain = 0;
       mode = evaluation ? 'evaluate' : 'train'; if (evaluation) evaluationResume = 'train';
       stats.message = 'Learning continues while you watch. Pause stops both training and playback.'; publish();
-    } else if (initialized && command.type === 'play' && best) {
+    } else if (initialized && (command.type === 'play' || command.type === 'restart-playback') && best) {
       stopDisplay(); paused = false; pausedMode = 'idle';
       stats.lastPlayback = null; playbackAgent = new DQNAgent(stats.seed); playbackAgent.loadWeights(best.weights); playbackEpisode = best.episode;
       playback = new DrivingEnvironment(viewTrack, stats.preset, true, targetLaps, minDistance); display = 'play'; nextPlayback = performance.now() + 100;

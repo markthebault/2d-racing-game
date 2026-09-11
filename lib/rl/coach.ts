@@ -1,3 +1,4 @@
+import { maskFeatures } from './features.ts';
 import * as tf from '@tensorflow/tfjs';
 import { DrivingEnvironment, ACTIONS } from './environment.ts';
 import { ProgressiveSteering } from '../steering.ts';
@@ -43,7 +44,7 @@ export class DrivingCoach {
       // Vary irrelevant history so the policy cannot rely on grid-only observation values.
       state[28]=random();state[29]=random()*.2;state[30]=random()*.8;state[31]=random()*.15;state[32]=random();state[33]=random()*.3;
       state[34]=Math.floor(random()*env.targetLaps)/env.targetLaps;state[46]=random()*.8;state[47]=1;
-      this.examples.push({state,action}); return;
+      this.examples.push({state: maskFeatures(state),action}); return;
     }
     const batch=Array.from({length:64},()=>this.examples[Math.floor(random()*this.examples.length)]);
     this.loss=tf.tidy(()=>this.optimizer.minimize(()=>tf.losses.softmaxCrossEntropy(tf.oneHot(tf.tensor1d(batch.map(r=>r.action),'int32'),9),model.apply(tf.tensor2d(batch.map(r=>r.state))) as tf.Tensor2D).mean() as tf.Scalar,true)!.dataSync()[0]);

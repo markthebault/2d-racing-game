@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { TRACKS, trackCurve, trackBounds, formatTime } from '@/lib/race';
 import { RaceEngine, type RaceStats } from '@/lib/engine';
 import { SensorDebug } from '@/components/sensor-debug';
-import { TrainingLab } from '@/components/training-lab';
+import { TrainingLab, type TrainingControls } from '@/components/training-lab';
 import { vehicleTelemetry } from '@/lib/telemetry';
 import type { FleetFrame } from '@/lib/rl/batch';
 
@@ -22,6 +22,7 @@ const TRACK_PREVIEWS = TRACKS.map((_, index) => {
 export default function Home() {
   const host = useRef<HTMLDivElement>(null);
   const engine = useRef<RaceEngine | null>(null);
+  const [aiControls, setAIControls] = useState<TrainingControls | null>(null);
   const [learning, setLearning] = useState(false);
   const [fleet, setFleet] = useState<FleetFrame | null>(null);
   const [singlePlayback, setSinglePlayback] = useState(false);
@@ -71,8 +72,8 @@ export default function Home() {
           {(!learning||singlePlayback)&&<div className="track-bottom"><span>{stats.offroad?'OFF ROAD · LOW GRIP':'ASPHALT · DRY'}</span><div className="speed"><strong>{Math.round(Math.abs(stats.speed)*5)}</strong><small>KM/H</small></div></div>}
           <div hidden={learning} className={learning?"ai-hidden":"touch-controls"} aria-label="Touch driving controls">{[['ArrowLeft','←'],['ArrowRight','→'],['ArrowDown','↓'],['ArrowUp','↑']].map(([key,label])=><button key={key} aria-label={key} onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);engine.current?.setKey(key,true);}} onPointerUp={()=>engine.current?.setKey(key,false)} onPointerCancel={()=>engine.current?.setKey(key,false)}>{label}</button>)}</div>
         </div>
-        <div className="race-footer"><span><span className="car-dot"/> {learning?'AI / CAR 01':'YOU / CAR 01'} <span className="footer-hint">Follow the track clockwise.</span></span><div><Button variant="ghost" disabled={learning} onClick={()=>engine.current?.reset()} aria-label="Reset race"><RotateCcw size={15}/> Reset</Button><Button variant="ghost" disabled={learning||!running||stats.status==='countdown'} onClick={()=>engine.current?.togglePause()}><Pause size={15}/>{stats.status==='paused'?'Resume':'Pause'}</Button></div></div>
-        {learning&&<TrainingLab track={track} laps={laps} onFrame={frame=>{setSinglePlayback(true);engine.current?.showAgent(frame);}} onFleet={frame=>{if(!frame||frame.time===0||performance.now()-fleetUiTime.current>150){setSinglePlayback(false);setFleet(frame);fleetUiTime.current=performance.now();}engine.current?.showFleet(frame);}}/>}
+        <div className="race-footer"><span><span className="car-dot"/> {learning?'AI / CAR 01':'YOU / CAR 01'} <span className="footer-hint">Follow the track clockwise.</span></span><div><Button variant="ghost" disabled={learning && !aiControls?.canReset} onClick={()=>learning ? aiControls?.reset() : engine.current?.reset()} aria-label="Reset race"><RotateCcw size={15}/> Reset</Button><Button variant="ghost" disabled={learning ? !aiControls?.canPause : !running||stats.status==='countdown'} onClick={()=>learning ? aiControls?.togglePause() : engine.current?.togglePause()}>{(learning ? aiControls?.paused : stats.status==='paused') ? <Play size={15}/> : <Pause size={15}/>} {(learning ? aiControls?.paused : stats.status==='paused')?'Resume':'Pause'}</Button></div></div>
+        {learning&&<TrainingLab onControlsChange={setAIControls} track={track} laps={laps} onFrame={frame=>{setSinglePlayback(true);engine.current?.showAgent(frame);}} onFleet={frame=>{if(!frame||frame.time===0||performance.now()-fleetUiTime.current>150){setSinglePlayback(false);setFleet(frame);fleetUiTime.current=performance.now();}engine.current?.showFleet(frame);}}/>}
       </section>
     </div>
     <SensorDebug readings={stats.rays} vehicle={stats.vehicle} visible={showRays} onToggle={()=>setShowRays(value=>!value)} open={debugOpen} onOpenChange={setDebugOpen}/>

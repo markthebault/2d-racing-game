@@ -21,6 +21,10 @@ Open the local URL printed in your terminal. Choose a circuit and lap count.
 
 Training runs locally with TensorFlow.js on the CPU in a browser worker. No Python server or API key needed. Saved model weights stay in your browser; refreshing ends the live training session.
 
+## Training input controls
+
+Under **Train AI → Train → Input parameters & experiment**, choose input groups and click **Start fresh session** to apply them. **Sensors and car only** disables map and race-progress inputs. Disabled inputs stay zero during training, evaluation, and playback, and saved models retain their settings. Absolute position also requires a preset that permits it. These switches leave rewards unchanged. For pure trial and error, also disable guided warm-up before training; the instructor still uses the map to generate labels.
+
 ## How the AI learns
 
 By default, the car first learns from 12,000 examples supplied by a track-following instructor. Then it uses **Double DQN**, a reinforcement learning algorithm, to improve through driving attempts. Turn off **Guided warm-up before RL** to learn from rewards alone.

@@ -319,3 +319,50 @@ body {
 .road-zoom{display:flex;gap:8px;margin-bottom:10px;}.road-zoom button{padding:7px 9px;border:1px solid #526b53;border-radius:5px;font-size:12px;}.road-zoom button[aria-pressed=true]{color:#daef8c;background:#30452e;}.action-row button:disabled{opacity:1;cursor:default;}.lesson-reward-row meter::-webkit-meter-bar{background:#334438;border:0;}.lesson-reward-row meter::-webkit-meter-optimum-value{background:#daef8c;}.lesson-reward-row meter.negative::-webkit-meter-optimum-value{background:#ffac80;}
 .lesson-toolbar nav button { transition:none; }
 @media(max-width:620px){.learning-explorer .lesson-header p{font-size:14px;}.network-inputs button{padding:6px 8px;}.network-flow{margin:16px 0;gap:10px;}}
+
+/* The AI workspace keeps transport controls available across focused views. */
+.training-lab { --background:#18251e; --foreground:#e8efe2; --muted:#24342a; --muted-foreground:#b8c6b0; --ring:#daef8c; }
+.lab-workspace { gap:0; min-width:0; }
+.lab-command-bar { position:sticky; top:-1px; z-index:3; background:#18251e; padding:1px 0 12px; border-bottom:1px solid #405044; }
+.lab-command-bar .session-label { margin:8px 0 12px; }
+.lab-command-bar .training-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.lab-command-bar .training-actions label { grid-column:1/-1; justify-content:space-between; }
+.lab-command-bar .training-actions select { padding:6px 10px; }
+.lab-command-bar .training-actions button { white-space:normal; }
+.lab-tabs[data-slot="tabs-list"] { display:flex; width:100%; height:44px; margin-top:16px; padding:4px; background:#101c16; border:1px solid #405044; border-radius:8px; }
+.lab-tabs [data-slot="tabs-trigger"] { color:#b8c6b0; min-height:34px; font-size:14px; }
+.lab-tabs [data-slot="tabs-trigger"][data-active] { background:#daef8c; color:#18251e; box-shadow:none; }
+.lab-panel { min-width:0; padding:6px 0 12px; }
+.lab-panel[hidden] { display:none!important; }
+.lab-panel-title { font-size:17px; font-weight:600; margin:4px 0 12px; }
+.lab-panel-intro { font-size:14px; line-height:1.65; color:#b8c6b0; margin-bottom:18px; }
+.lab-overview { margin-bottom:16px; grid-template-columns:1fr 1fr; }
+.lab-disclosure { border:1px solid #405044; border-radius:8px; padding:14px; margin:16px 0; min-width:0; }
+.lab-disclosure>summary,.lab-help>summary,.fresh-session>summary { cursor:pointer; font-size:14px; font-weight:600; color:#e8efe2; }
+.lab-disclosure>summary small { display:block; font-weight:400; font-size:13px; color:#b8c6b0; line-height:1.6; margin:6px 0 0 18px; }
+.lab-disclosure[open]>summary { margin-bottom:16px; }
+.lab-disclosure .training-plan { border:0; border-bottom:1px solid #405044; border-radius:0; padding:0 0 16px; }
+.lab-disclosure .training-plan legend { padding:0 0 12px; font-size:14px; }
+.lab-disclosure .batch-summary { padding:0; margin:0; background:transparent; border:0; }
+.lab-help { margin:14px 0; padding-top:12px; border-top:1px solid #405044; }
+.lab-help>summary { color:#b8c6b0; font-weight:400; }
+.lab-panel .model-library { margin:0; border:0; padding:0; }
+.lab-panel .model-library h4 { font-size:17px; font-weight:600; }
+.fresh-session { border-top:1px solid #405044; padding-top:18px; margin-top:20px; }
+.training-feature-controls { border:1px solid #405044; padding:12px; border-radius:8px; margin:16px 0; }
+.training-feature-controls legend { font-size:14px; padding:0 6px; }
+.lab-panel .training-explanation { display:block; margin-top:18px; }
+.lab-panel .training-charts { margin-bottom:20px; }
+.training-lab .model-storage-note,.training-lab .model-library p { font-size:13px; }
+.training-lab label,.training-lab .model-library label { font-size:14px; }
+.training-lab :is(button,summary,select,input):focus-visible { outline:2px solid #daef8c; outline-offset:3px; }
+.training-lab select { max-width:100%; }
+@media(min-width:1300px) { .learning-mode .lab-command-bar { top:-18px; padding-top:12px; } }
+@media(max-width:600px) {
+  .lab-command-bar { position:static; }
+  .lab-disclosure { padding:12px; }
+  .lab-panel .experiment-controls { grid-template-columns:1fr; }
+  .training-track-choices span { flex-wrap:wrap; }
+}
+.lab-pending { display:inline-block; margin-left:8px; font-size:12px; font-weight:400; color:#daef8c; }
+.batch-summary .lab-help small { display:block; margin:8px 0; }

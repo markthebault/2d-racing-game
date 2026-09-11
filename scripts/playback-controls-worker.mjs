@@ -1,0 +1,71 @@
+import { Worker } from 'node:worker_threads';
+import { readdir, readFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+import assert from 'node:assert/strict';
+const folder = resolve('dist/client/_next/static');
+const file = (await readdir(folder)).find(name => /^training\.worker-.*\.js$/.test(name));
+assert.ok(file, 'Training worker must be included in the build');
+const chunks = await readdir(resolve(folder, 'chunks'));
+const page = (await Promise.all(chunks.filter(name => /^page-.*\.js$/.test(name)).map(name => readFile(resolve(folder, 'chunks', name), 'utf8')))).join('\n');
+const constructor = page.match(/new Worker\(new URL\([^)]*\)/)?.[0];
+assert.ok(constructor?.includes('window.location.href'), 'Resolve the worker against the HTTP page, not a build-time file URL');
+assert.ok(!constructor.includes('file:')); assert.ok(page.includes(file));
+const script = `import {parentPort} from 'node:worker_threads'; globalThis.self=globalThis; globalThis.process=undefined; globalThis.WorkerGlobalScope=class {}; globalThis.postMessage=(message)=>parentPort.postMessage(message); await import(${JSON.stringify(pathToFileURL(resolve(folder, file)).href)}); parentPort.on('message',data=>globalThis.onmessage({data}));`;
+function launch() {
+  const worker = new Worker(new URL('data:text/javascript,' + encodeURIComponent(script)), { type: 'module' });
+  const messages = []; let latest;
+  worker.on('error', error => messages.push({ type: 'error', message: error.message }));
+  worker.on('message', m => { messages.push(m); if (m.type === 'stats') latest = m.stats; });
+  return { worker, messages, get latest(){return latest;}, async wait(predicate) {
+    const deadline=Date.now()+90000;
+    while(!predicate()) { const failure=messages.find(m=>m.type==='error');if(failure)throw new Error(failure.message);if(Date.now()>deadline)throw new Error('Worker timed out: '+JSON.stringify({episode:latest?.episode,status:latest?.status,steps:latest?.steps,paused:latest?.pausedActivity}));await new Promise(r=>setTimeout(r,20)); }
+  }};
+}
+const source = launch();
+const send = command => source.worker.postMessage(command);
+const frames = () => source.messages.filter(m => m.type === 'frame');
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+try {
+  send({type:'init', track:0, checkpoint:null, preset:'local', seed:42});
+  await source.wait(() => source.latest?.status === 'ready');
+  send({type:'speed', speed:0}); send({type:'train'});
+  await source.wait(() => source.latest?.best);
+  send({type:'speed', speed:1}); send({type:'play'});
+  await source.wait(() => source.latest.status === 'playing' && frames().at(-1)?.frame.time > 0);
+  send({type:'pause'});
+  await source.wait(() => source.latest.status === 'paused');
+  const before = {...source.latest}, count = frames().length;
+  await delay(200);
+  assert.equal(frames().length, count, 'Pause freezes model playback');
+  assert.equal(source.latest.steps, before.steps, 'Pause freezes learning');
+  send({type:'restart-playback'});
+  await source.wait(() => frames().length > count);
+  assert.equal(frames().at(-1).frame.time, 0);
+  assert.equal(source.latest.status, 'paused', 'Reset preserves pause');
+  assert.equal(source.latest.playbackEpisode, before.playbackEpisode, 'Reset uses the same model snapshot');
+  assert.equal(source.latest.steps, before.steps);
+  assert.equal(source.latest.updates, before.updates);
+  assert.equal(source.latest.replaySize, before.replaySize, 'Reset preserves experience memory');
+  const resetCount = frames().length;
+  await delay(150); assert.equal(frames().length, resetCount);
+  send({type:'resume'});
+  await source.wait(() => source.latest.status === 'playing' && frames().at(-1).frame.time > 0);
+  const start = frames().length;
+  send({type:'restart-playback'});
+  await source.wait(() => frames().slice(start).some(m => m.frame.time === 0));
+  assert.equal(source.latest.status, 'playing', 'Reset while driving keeps playback running');
+  send({type:'train'}); send({type:'speed',speed:0});
+  await source.wait(() => source.latest.status === 'replaying');
+  send({type:'pause'}); await source.wait(() => source.latest.status === 'paused');
+  const batchSteps = source.latest.steps;
+  const fleets = () => source.messages.filter(m => m.type === 'fleet' && m.frame);
+  const batchCount = fleets().length, first = fleets().at(-1).frame.first;
+  send({type:'restart-playback'});
+  await source.wait(() => fleets().length > batchCount);
+  assert.equal(fleets().at(-1).frame.time, 0);
+  assert.equal(fleets().at(-1).frame.first, first, 'Reset retains the replay group');
+  assert.equal(source.latest.steps, batchSteps);
+  assert.equal(source.latest.status, 'paused');
+  console.log('AI pause, resume, model reset, and fleet reset passed.');
+} finally { await source.worker.terminate(); }

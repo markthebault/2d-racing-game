@@ -22,18 +22,18 @@ export type RayReading = RayDefinition & {
 // Stable ordering is part of the observation contract: F1–F9, then B1–B3.
 // All distances are world units, not calibrated physical meters.
 export const RAY_DEFINITIONS: readonly RayDefinition[] = [
-  { id: 'F1', bank: 'front', angleDeg: -75, maxRange: 10, originOffset: 1.65 },
-  { id: 'F2', bank: 'front', angleDeg: -50, maxRange: 16, originOffset: 1.65 },
-  { id: 'F3', bank: 'front', angleDeg: -30, maxRange: 24, originOffset: 1.65 },
-  { id: 'F4', bank: 'front', angleDeg: -15, maxRange: 30, originOffset: 1.65 },
-  { id: 'F5', bank: 'front', angleDeg: 0, maxRange: 32, originOffset: 1.65 },
-  { id: 'F6', bank: 'front', angleDeg: 15, maxRange: 30, originOffset: 1.65 },
-  { id: 'F7', bank: 'front', angleDeg: 30, maxRange: 24, originOffset: 1.65 },
-  { id: 'F8', bank: 'front', angleDeg: 50, maxRange: 16, originOffset: 1.65 },
-  { id: 'F9', bank: 'front', angleDeg: 75, maxRange: 10, originOffset: 1.65 },
-  { id: 'B1', bank: 'rear', angleDeg: -135, maxRange: 10, originOffset: -1.65 },
-  { id: 'B2', bank: 'rear', angleDeg: 180, maxRange: 16, originOffset: -1.65 },
-  { id: 'B3', bank: 'rear', angleDeg: 135, maxRange: 10, originOffset: -1.65 },
+  { id: 'F1', bank: 'front', angleDeg: -75, maxRange: 15, originOffset: 1.65 },
+  { id: 'F2', bank: 'front', angleDeg: -50, maxRange: 24, originOffset: 1.65 },
+  { id: 'F3', bank: 'front', angleDeg: -30, maxRange: 36, originOffset: 1.65 },
+  { id: 'F4', bank: 'front', angleDeg: -15, maxRange: 45, originOffset: 1.65 },
+  { id: 'F5', bank: 'front', angleDeg: 0, maxRange: 48, originOffset: 1.65 },
+  { id: 'F6', bank: 'front', angleDeg: 15, maxRange: 45, originOffset: 1.65 },
+  { id: 'F7', bank: 'front', angleDeg: 30, maxRange: 36, originOffset: 1.65 },
+  { id: 'F8', bank: 'front', angleDeg: 50, maxRange: 24, originOffset: 1.65 },
+  { id: 'F9', bank: 'front', angleDeg: 75, maxRange: 15, originOffset: 1.65 },
+  { id: 'B1', bank: 'rear', angleDeg: -135, maxRange: 15, originOffset: -1.65 },
+  { id: 'B2', bank: 'rear', angleDeg: 180, maxRange: 24, originOffset: -1.65 },
+  { id: 'B3', bank: 'rear', angleDeg: 135, maxRange: 15, originOffset: -1.65 },
 ];
 
 const EPSILON = 1e-9;

@@ -1,6 +1,7 @@
+import { maskFeatures } from './features.ts';
 import { MotionWindow, DEFAULT_MIN_DISTANCE } from './motion.ts';
 import { sampleTrack, trackEdges, trackBounds, TRACKS, ROAD_EDGE_OFFSET, ROAD_WIDTH } from '../race.ts';
-import { senseTrack } from '../sensors.ts';
+import { senseTrack, RAY_DEFINITIONS } from '../sensors.ts';
 import { ProgressiveSteering } from '../steering.ts';
 import { stepVehicle, type VehicleState, type Controls } from '../vehicle.ts';
 
@@ -150,13 +151,13 @@ export class DrivingEnvironment {
     if (!PRESETS[this.preset].absolutePosition) values.fill(0, 20, 24);
     const relativeArc = (this.project().arc - this.startArc + this.length) % this.length;
     const context=this.roadContext();
-    return [...values, clamp(this.time / (90 * this.targetLaps), 0, 1), clamp(this.stalledTime / 6, 0, 1),
+    return maskFeatures([...values, clamp(this.time / (90 * this.targetLaps), 0, 1), clamp(this.stalledTime / 6, 0, 1),
       squash(this.distance / this.length), squash((this.furthest - this.distance) / this.length),
       this.gates / this.checkpointCount, (this.nextGate - relativeArc) / this.length, this.completedLaps / this.targetLaps, this.targetLaps / 10,
       ...context.waypoints, this.halfWidth/5, context.safeSpeed/40,
       this.motion.distance === null ? 0 : squash(this.motion.distance/5), this.motion.fraction, this.minDistance/5,
-      clamp(values[4]*32 / Math.max(1,Math.abs(this.state.speed)) / 2,0,1),
-      this.steering.value * Math.min(Math.abs(this.state.speed)/7,1) * Math.sign(this.state.speed), this.controls.steering];
+      clamp(values[4]*RAY_DEFINITIONS[4].maxRange / Math.max(1,Math.abs(this.state.speed)) / 2,0,1),
+      this.steering.value * Math.min(Math.abs(this.state.speed)/7,1) * Math.sign(this.state.speed), this.controls.steering]);
   }
   step(action: number) {
     if (this.done) throw new Error('Reset the episode before stepping it again.');

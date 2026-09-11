@@ -1,7 +1,8 @@
 'use client';
 import { LearningExplorer } from './learning-explorer';
 import type { DecisionReading } from '../lib/rl/insights';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 // eslint-disable-next-line import/default -- Vite provides the asset URL as this query module's default export.
 import trainingWorkerUrl from '../lib/rl/training.worker.ts?worker&url';
 import { Play, Pause, BrainCircuit } from 'lucide-react';
@@ -13,11 +14,12 @@ import { TRACKS } from '@/lib/race';
 import { ACTION_NAMES, type AgentFrame } from '@/lib/rl/environment';
 import { PRESETS, type Preset } from '@/lib/rl/config';
 import { MODEL_PREFIX, migrateModel, modelKey, type Checkpoint } from '@/lib/rl/models';
+import { DEFAULT_FEATURES, SENSOR_FEATURES, FEATURE_GROUPS, type FeatureSettings } from '@/lib/rl/features';
 import { emptyTrainingStats, type ComparisonReport, type WorkerCommand, type WorkerMessage } from '@/lib/rl/protocol';
 import type { EvaluationSummary } from '@/lib/rl/evaluation';
 import type { FleetFrame } from '@/lib/rl/batch';
 
-type Session = { preset: Preset; seed: number; checkpoint: Checkpoint | null; revision: number };
+type Session = { features?: FeatureSettings; preset: Preset; seed: number; checkpoint: Checkpoint | null; revision: number };
 type LibraryEntry = { key: string; model: Checkpoint; legacy: boolean };
 function readModels(): LibraryEntry[] {
   const result: LibraryEntry[] = [];
@@ -29,11 +31,14 @@ function readModels(): LibraryEntry[] {
   }
   return result.reverse();
 }
-export function TrainingLab({ track, laps, onFrame, onFleet }: { track: number; laps: number; onFrame: (frame: AgentFrame) => void; onFleet: (frame: FleetFrame | null) => void }) {
+export type TrainingControls = { paused: boolean; canPause: boolean; canReset: boolean; togglePause: () => void; reset: () => void };
+export function TrainingLab({ track, laps, onFrame, onFleet, onControlsChange }: { onControlsChange: (controls: TrainingControls | null) => void; track: number; laps: number; onFrame: (frame: AgentFrame) => void; onFleet: (frame: FleetFrame | null) => void }) {
   const [session, setSession] = useState<Session>({ preset: 'local', seed: 42, checkpoint: null, revision: 0 });
   const [models, setModels] = useState<LibraryEntry[]>([]);
   const [selected, setSelected] = useState('');
+  const [view, setView] = useState('train');
   const [preset, setPreset] = useState<Preset>('local');
+  const [features, setFeatures] = useState<FeatureSettings>({...DEFAULT_FEATURES});
   const [seed, setSeed] = useState(42);
   const [notice, setNotice] = useState('Saved models from every circuit are available here.');
   useEffect(() => { queueMicrotask(() => { try { setModels(readModels()); } catch { setNotice('Browser storage is unavailable. This session can still train and play models in memory.'); } }); }, []);
@@ -44,22 +49,35 @@ export function TrainingLab({ track, laps, onFrame, onFleet }: { track: number; 
     try { localStorage.setItem(entry.key, JSON.stringify(model)); setNotice('Best model saved. Loading it on another circuit keeps the source model and evaluates a separate copy.'); }
     catch { setNotice('Browser storage is unavailable or full. The latest model is available in this session, but will not survive closing the page.'); }
   };
-  const start = (checkpoint: Checkpoint | null) => setSession(s => ({ checkpoint, preset: checkpoint?.preset ?? preset, seed: checkpoint?.seed ?? seed, revision: s.revision + 1 }));
+  const start = (checkpoint: Checkpoint | null) => {
+    setView('train');
+    setSession(s => ({ checkpoint, features: checkpoint ? checkpoint.features ?? {...DEFAULT_FEATURES} : {...features}, preset: checkpoint?.preset ?? preset, seed: checkpoint?.seed ?? seed, revision: s.revision + 1 }));
+  };
   return <section className="training-lab" aria-label="Reinforcement learning lab">
     <header className="training-header"><div><span className="eyebrow"><BrainCircuit size={15}/> REINFORCEMENT LEARNING</span><h3>Teach the car to drive</h3></div></header>
-    <details className="model-library">
-      <summary>Models & experiments</summary>
+    <Tabs value={view} onValueChange={value => setView(String(value))} className="lab-workspace">
+    <TrainingSession key={session.revision} track={track} laps={laps} config={session} onFrame={onFrame} onFleet={onFleet} onSave={saveModel} onControlsChange={onControlsChange} modelsPanel={<>
+    <div className="model-library">
+      <h4>Saved models</h4>
       <label>Saved model · any circuit<select value={selected} onChange={e => setSelected(e.target.value)}><option value="">Choose a saved model</option>{models.map(entry => <option key={entry.key} value={entry.key}>{TRACKS[entry.model.track].name} · {entry.model.preset} · seed {entry.model.seed} · ep {entry.model.episode}{entry.legacy ? ' · legacy' : ''}{entry.model.guided ? ' · guided' : ''} · {entry.model.id.slice(-5)}</option>)}</select></label>
       <Button variant="outline" disabled={!saved} onClick={() => start(saved!.model)}>Load on {TRACKS[track].name}</Button>
       <p>Loading starts a new three-track session and evaluates the saved weights across that set. Run the model on the viewed circuit or continue shared training. Source weights are retained. A successful load does not guarantee a completed race.</p>
+
+    </div>
+
+    <output className="model-storage-note storage-notice">{notice} Models and reports stay in this browser. Older models load as the corrected baseline with their learned weights preserved.</output>
+    </>} trainingSettings={<div className="model-library">
+      <details className="lab-disclosure"><summary>Input parameters & experiment</summary>
       <div className="experiment-controls"><label>New experiment<select value={preset} onChange={e => setPreset(e.target.value as Preset)}>{Object.entries(PRESETS).map(([key, config]) => <option key={key} value={key}>{config.label}</option>)}</select></label><label>Training seed<input type="number" min={0} max={2147483647} value={seed} onChange={e => setSeed(Math.max(0, Math.min(2147483647, Math.floor(Number(e.target.value) || 0))))}/></label></div>
+      <fieldset className="training-feature-controls"><legend>Inputs for the next fresh session</legend><p>Disabled inputs become zero in training, evaluation and playback. Rewards stay unchanged. Saved models restore their own input settings.</p><div className="training-actions"><Button variant="outline" onClick={()=>setFeatures({...DEFAULT_FEATURES})}>All input groups</Button><Button variant="outline" onClick={()=>setFeatures({...SENSOR_FEATURES})}>Sensors and car only</Button></div>{FEATURE_GROUPS.map(group=><label key={group.id} style={{display:"block",margin:"12px 0"}}><input style={{width:"auto",display:"inline-block",marginRight:8,accentColor:"#d9ee8b"}} type="checkbox" checked={features[group.id]} onChange={event=>setFeatures(previous=>({...previous,[group.id]:event.target.checked}))}/> {group.label}<small style={{display:"block"}}>{group.description}</small></label>)}<p>For trial and error from scratch, also disable guided warm-up in the new session before starting training. The instructor uses the map even when map inputs are disabled.</p></fieldset>
       <Button variant="outline" onClick={() => start(null)}>Start fresh session</Button><p>This ends the current live session. Saved models remain available.</p>
-    </details>
-    <TrainingSession key={session.revision} track={track} laps={laps} config={session} onFrame={onFrame} onFleet={onFleet} onSave={saveModel}/>
-    <p className="model-storage-note">{notice} Models and reports stay in this browser. Older models load as the corrected baseline with their learned weights preserved.</p>
+      </details>
+    <p className="model-storage-note">Current session inputs: {FEATURE_GROUPS.filter(group => (session.features ?? DEFAULT_FEATURES)[group.id] && (group.id !== "absolute" || PRESETS[session.preset].absolutePosition)).map(group=>group.label).join(", ") || "None"}. Change the input selection and start a fresh session to apply it.</p>
+    </div>}/>
+    </Tabs>
   </section>;
 }
-function TrainingSession({ track, laps, config, onFrame, onFleet, onSave }: { track: number; laps: number; config: Session; onFrame: (frame: AgentFrame) => void; onFleet: (frame: FleetFrame | null) => void; onSave: (model: Checkpoint) => void }) {
+function TrainingSession({ track, laps, config, onFrame, onFleet, onSave, modelsPanel, trainingSettings, onControlsChange }: { onControlsChange: (controls: TrainingControls | null) => void; trainingSettings: ReactNode; modelsPanel: ReactNode; track: number; laps: number; config: Session; onFrame: (frame: AgentFrame) => void; onFleet: (frame: FleetFrame | null) => void; onSave: (model: Checkpoint) => void }) {
   const worker = useRef<Worker | null>(null), callbacks = useRef({ onFrame, onFleet, onSave, track, laps });
   const initialTrack = useRef(track);
   const initialLaps = useRef(laps);
@@ -100,7 +118,7 @@ function TrainingSession({ track, laps, config, onFrame, onFleet, onSave }: { tr
       }
     };
     instance.onerror = event => setStats(s => ({ ...s, status: 'error', message: event.message ? `Training worker error: ${event.message}. Reload to retry; saved models are retained.` : 'The training worker could not load. Reload to retry; saved models are retained.' }));
-    instance.postMessage({ type: 'init', coach: !config.checkpoint, trainingTracks: [0, 1, 2], variedStarts: true, track, laps: initialLaps.current, checkpoint: config.checkpoint, preset: config.preset, seed: config.seed } satisfies WorkerCommand);
+    instance.postMessage({ type: 'init', features: config.features, coach: !config.checkpoint, trainingTracks: [0, 1, 2], variedStarts: true, track, laps: initialLaps.current, checkpoint: config.checkpoint, preset: config.preset, seed: config.seed } satisfies WorkerCommand);
     const pauseHidden = () => { if (document.hidden) instance.postMessage({ type: 'pause' }); };
     document.addEventListener('visibilitychange', pauseHidden);
     return () => { active = false; instance.terminate(); worker.current = null; document.removeEventListener('visibilitychange', pauseHidden); };
@@ -108,6 +126,16 @@ function TrainingSession({ track, laps, config, onFrame, onFleet, onSave }: { tr
   useEffect(() => { worker.current?.postMessage({ type: 'track', track, laps } satisfies WorkerCommand); }, [track, laps]);
   const command = (message: WorkerCommand) => worker.current?.postMessage(message);
   const busy = ['coaching', 'training', 'evaluating', 'playing', 'replaying'].includes(stats.status), unavailable = ['loading', 'error'].includes(stats.status) || stats.track !== track || stats.targetLaps !== laps;
+  const paused = stats.status === 'paused';
+  const canReset = !unavailable && (!!stats.best || stats.status === 'replaying' || stats.pausedActivity === 'batch');
+  useEffect(() => {
+    onControlsChange({
+      paused, canPause: !unavailable && (busy || paused), canReset,
+      togglePause: () => worker.current?.postMessage({ type: paused ? 'resume' : 'pause' } satisfies WorkerCommand),
+      reset: () => worker.current?.postMessage({ type: 'restart-playback' } satisfies WorkerCommand),
+    });
+    return () => onControlsChange(null);
+  }, [paused, unavailable, busy, canReset, onControlsChange]);
   const comparing = !!stats.comparison && !stats.comparison.complete;
   const report = stats.comparison?.track === track ? stats.comparison : savedReport?.track === track ? savedReport : null;
   const rewardConfig = PRESETS[stats.preset], bestEval = stats.best?.evaluation;
@@ -118,7 +146,29 @@ function TrainingSession({ track, laps, config, onFrame, onFleet, onSave }: { tr
   const bestResults = stats.best?.evaluations ?? [];
   const sharedScore = bestResults.length ? bestResults.reduce((sum,r)=>sum+r.meanScore,0)/bestResults.length : bestEval?.meanScore;
   return <>
-    <LearningExplorer reading={reading} stats={stats} command={command}/>
+    <div className="lab-command-bar">
+    <div className="session-label"><span>{PRESETS[stats.preset].label} · seed {stats.seed}</span><span className={'training-status ' + (busy ? 'active' : '')}>{stats.status.replace('-', ' ')}</span></div>
+    <div className="training-actions">
+      <Button className="train-button" disabled={unavailable} onClick={() => command({ type: busy ? 'pause' : 'resume' })}>{busy ? <Pause size={16}/> : <Play size={16}/>} {busy ? 'Pause all' : stats.pausedActivity === 'batch' || stats.pausedActivity === 'play' || stats.pausedActivity === 'coach' ? 'Resume all' : stats.steps ? 'Resume training' : 'Start training'}</Button>
+      {stats.pausedActivity === 'play' && stats.status === 'paused' && <Button variant="outline" onClick={() => command({ type: 'train' })}>Return to training</Button>}
+      <Button variant="outline" disabled={!stats.best || unavailable || stats.status === 'playing'} onClick={() => command({ type: 'play' })}><Play size={16}/> Run best model</Button>
+      <label>Training speed<select value={speed} onChange={e => { const next = Number(e.target.value); setSpeed(next); command({ type: 'speed', speed: next }); }}><option value={1}>1×</option><option value={4}>4×</option><option value={20}>20×</option><option value={0}>Fastest</option></select></label>
+    </div>
+    <TabsList className="lab-tabs" aria-label="AI workspace">
+      <TabsTrigger value="train">Train</TabsTrigger>
+      <TabsTrigger value="results">Results</TabsTrigger>
+      <TabsTrigger value="models">Models</TabsTrigger>
+      <TabsTrigger value="learn">Learn</TabsTrigger>
+    </TabsList>
+    </div>
+    <output className="training-message">{stats.message}{stats.evaluationCase && <span className="evaluation-case">{stats.evaluationCase}</span>}</output>
+    <TabsContent value="train" className="lab-panel" keepMounted>
+      <div className="lab-overview training-metrics">
+        <Metric label="Episodes" value={stats.episode.toLocaleString()}/>
+        <Metric label="Best evaluation completion" value={bestResults.length ? `${(bestResults.reduce((sum, result) => sum + result.successRate, 0) / bestResults.length * 100).toFixed(0)}%` : bestEval ? `${(bestEval.successRate * 100).toFixed(0)}%` : '—'}/>
+      </div>
+      <details className="lab-disclosure">
+        <summary><span>Training setup{planChanged && <b className="lab-pending">Unapplied changes</b>}<small>{stats.trainingTracks.map(t => TRACKS[t].name).join(' · ')} · {laps} {laps === 1 ? 'lap' : 'laps'}</small></span></summary>
     <fieldset className="training-plan">
       <legend>Training circuits</legend>
       <label><input type="checkbox" checked={multi} onChange={e=>setMulti(e.target.checked)}/> Train across three tracks</label>
@@ -128,33 +178,41 @@ function TrainingSession({ track, laps, config, onFrame, onFleet, onSave }: { tr
       <Button variant="outline" disabled={unavailable || comparing || (multi && draftTracks.length!==3) || !planChanged} onClick={()=>command({type:'plan',tracks:planTracks,variedStarts:varied})}>Apply training setup</Button>
       <small>Applying restarts the current attempt and evaluates the retained weights. The circuit menu changes what you watch; it does not change an active three-track selection.</small>
     </fieldset>
-    <div className="session-label"><span>{PRESETS[stats.preset].label} · seed {stats.seed}</span><span className={'training-status ' + (busy ? 'active' : '')}>{stats.status.replace('-', ' ')}</span></div>
-    {stats.preset !== 'adaptive' && <details className="model-storage-note"><summary>Experimental corner rewards</summary><p>Corner-aware rewards are experimental and did not consistently improve our controlled tests. Switching retains weights but clears old scores and experience. Guided warm-up is the alternative tested below.</p><Button variant="outline" disabled={unavailable || comparing} onClick={()=>command({type:'upgrade'})}>Use corner-aware rewards</Button></details>}
     <div className="training-plan"><label><input type="checkbox" checked={stats.coachEnabled} disabled={unavailable || busy || comparing} onChange={event=>command({type:'coach',enabled:event.target.checked})}/> Guided warm-up before RL</label><small>A geometric instructor labels states on the selected training tracks. The neural network learns those examples, then continues reinforcement learning with a demonstration regularizer. Model playback never calls the instructor.</small>{stats.coachEnabled && <><progress max={16000} value={stats.coachSamples+stats.coachUpdates}/><small>{stats.coachSamples.toLocaleString()}/12,000 examples · {stats.coachUpdates.toLocaleString()}/4,000 warm-up updates{stats.coachLoss===null?'':` · lesson loss ${stats.coachLoss.toFixed(3)}`}</small></>}</div>
-    <div className="training-actions">
-      <Button className="train-button" disabled={unavailable} onClick={() => command({ type: busy ? 'pause' : 'resume' })}>{busy ? <Pause size={16}/> : <Play size={16}/>} {busy ? 'Pause all' : stats.pausedActivity === 'batch' || stats.pausedActivity === 'play' || stats.pausedActivity === 'coach' ? 'Resume all' : stats.steps ? 'Resume training' : 'Start training'}</Button>
-      {stats.pausedActivity === 'play' && stats.status === 'paused' && <Button variant="outline" onClick={() => command({ type: 'train' })}>Return to training</Button>}
-      <Button variant="outline" disabled={!stats.best || unavailable || stats.status === 'playing'} onClick={() => command({ type: 'play' })}><Play size={16}/> Run best model</Button>
-      <Button variant="outline" disabled={!stats.best || unavailable || comparing || stats.status === 'evaluating'} onClick={() => command({ type: 'evaluate' })}>Evaluate best · {stats.trainingTracks.length * 5} starts</Button>
-      <Button variant="outline" disabled={!stats.best || unavailable || comparing || stats.status==='evaluating'} onClick={()=>command({type:'validate'})}>Test all 5 tracks</Button>
-      <label>Training speed<select value={speed} onChange={e => { const next = Number(e.target.value); setSpeed(next); command({ type: 'speed', speed: next }); }}><option value={1}>1×</option><option value={4}>4×</option><option value={20}>20×</option><option value={0}>Fastest</option></select></label>
-      <label>Minimum movement / 1 s<select aria-label="Minimum movement / 1 s" disabled={unavailable || comparing} value={stats.minDistance} onChange={e => command({ type: 'motion', minDistance: Number(e.target.value) })}>{[0, .25, .5, 1, 2, 3, 5].map(value => <option key={value} value={value}>{value ? `${value} world units` : 'Off'}</option>)}</select></label>
-    </div>
+      <div className="training-actions lab-motion">
+      <label>Minimum movement / 1 s<select aria-label="Minimum movement / 1 s" disabled={unavailable || comparing} value={stats.minDistance} onChange={e => command({ type: 'motion', minDistance: Number(e.target.value) })}>{[0, .25, .5, 1, 2, 3, 5].map(value => <option key={value} value={value}>{value ? `${value} world units` : 'Off'}</option>)}</select></label>      </div>
+      <details className="lab-help"><summary>Movement rules & reset behavior</summary>
     <p className="model-storage-note">Moving less than the selected distance over one simulated second ends the run with {stats.preset === 'adaptive' ? '−250' : '−100'} points, including playback. Net displacement counts, so rocking back and forth can fail. Changing this setting restarts the attempt and evaluation, clears recordings and experience memory, and retains learned weights. A new session defaults to 1 unit.</p>
     {frame && <p className="model-storage-note">Movement over 1 s: {frame.motionDistance === null ? 'Measuring…' : `${frame.motionDistance.toFixed(2)} units`} · minimum {frame.minDistance}</p>}
+      </details>
+      </details>
+    {trainingSettings}
+    {frame && <div className="training-live"><span>{stats.status === 'playing' || stats.status === 'playback-ended' ? 'BEST MODEL' : stats.status === 'evaluating' ? 'EVALUATION · NO EXPLORATION' : 'CURRENT ATTEMPT'}</span><strong>{frame ? ACTION_NAMES[frame.action] : 'Waiting'}</strong><label>Race progress<progress max={1} value={frame?.progress ?? 0}/><b>{((frame?.progress ?? 0) * 100).toFixed(1)}%</b></label></div>}
     {stats.lastPlayback && <p className="model-storage-note">Last playback · model episode {stats.lastPlayback.episode}: {stats.lastPlayback.reason}. Score {stats.lastPlayback.score.toFixed(0)} · {stats.lastPlayback.completedLaps}/{stats.lastPlayback.targetLaps} laps.</p>}
+      <details className="lab-disclosure" open><summary>Replay & live activity</summary>
     <div className="batch-summary">
       <strong>{stats.backgroundLearning ? "Background learner active" : "Learner paused"}</strong>
       <span>Training on {TRACKS[stats.trainingTrack]?.name} · start {(stats.startFraction*100).toFixed(0)}% around the circuit</span>
-      <small>Active set: {stats.trainingTracks.map(t=>TRACKS[t].name).join(' · ')}. {stats.variedStarts ? 'Varied starts on.' : 'Finish-line starts only.'}</small>
       <small>{stats.playbackEpisode !== null ? `Watching model from episode ${stats.playbackEpisode}. ` : ""}{stats.queuedGroups} replay groups queued{stats.skippedGroups ? ` · ${stats.skippedGroups} older groups skipped to keep memory bounded` : ""}. Playback never adds training experiences.</small>
       <label>Replay speed <select aria-label="Replay speed" value={replaySpeed} onChange={event=>{const speed=Number(event.target.value);setReplaySpeed(speed);command({type:'replay-speed',speed});}}>{[1,2,4,8].map(speed=><option key={speed} value={speed}>{speed}×</option>)}</select></label>
-      <small>{laps} laps per attempt · {stats.checkpointCount} checkpoints per lap · +{(1000 / stats.checkpointCount).toFixed(2).replace(/\.00$/, "")} each. Changing laps starts a new attempt and evaluation, retaining the learner.</small>
       <strong>{fleet ? `Episodes ${fleet.first}–${fleet.last} · ${fleet.poses.length} cars on this circuit` : `Next group · ${stats.batchCount}/50 recorded`}</strong>
       {fleet ? <><span>{fleet.poses.filter(p => !p.done).length} driving · {fleet.time.toFixed(1)} / {fleet.duration.toFixed(1)} s · replay {fleet.speed}×</span><progress value={fleet.time} max={fleet.duration}/><Button variant="outline" onClick={() => command({ type: 'skip-replay' })}>Skip this replay</Button></> : <><progress value={stats.batchCount} max={50}/><span>Training stays off-screen. Groups of 50 replay while training continues. Each circuit shows only its own recorded cars; switch circuits to see the others.</span></>}
+      <details className="lab-help"><summary>Replay details & scoring</summary>
+      <small>Active set: {stats.trainingTracks.map(t=>TRACKS[t].name).join(' · ')}. {stats.variedStarts ? 'Varied starts on.' : 'Finish-line starts only.'}</small>
+      <small>{laps} laps per attempt · {stats.checkpointCount} checkpoints per lap · +{(1000 / stats.checkpointCount).toFixed(2).replace(/\.00$/, "")} each. Changing laps starts a new attempt and evaluation, retaining the learner.</small>
       <small>Learning across: {stats.trainedTracks.length ? stats.trainedTracks.map(t => TRACKS[t].name).join(' · ') : 'No circuits yet'}. One learner shares experience across the active set.</small>
+      </details>
     </div>
-    <output className="training-message">{stats.message}{stats.evaluationCase && <span className="evaluation-case">{stats.evaluationCase}</span>}</output>
+      </details>
+      <details className="lab-help"><summary>Session storage & browser behavior</summary>
+    <p className="model-storage-note">Everything runs in this browser. Hiding the tab pauses it. Circuit changes retain weights, optimizer, exploration and experience memory. In three-track mode the view can change without resetting the learner or replay group. Starting a fresh session or loading a saved model resets live experience memory. Best-model playback allows five continuous seconds off-road.</p>
+      </details>
+    </TabsContent>
+    <TabsContent value="results" className="lab-panel" keepMounted>
+      <h4 className="lab-panel-title">Training progress</h4>
+    <label className="chart-filter">Chart circuit <select aria-label="Chart circuit" value={chartTrack} onChange={e=>setChartTrack(e.target.value)}><option value="all">All training circuits</option>{TRACKS.map((circuit,index)=><option key={index} value={index}>{circuit.name}</option>)}</select></label>
+    <div className="training-charts"><TrainingChart title="Score per episode" description="Lime: each attempt. Blue: rolling mean of 20." data={chartData} kind="score"/><TrainingChart title="Learning loss" description="Reward-prediction error; guided training also includes a demonstration loss. Lower loss alone does not mean better driving." data={chartData} kind="loss"/></div>
+      <details className="lab-disclosure"><summary>All training metrics</summary>
     <div className="training-metrics">
       <Metric label="Laps completed" value={`${frame?.completedLaps ?? stats.completedLaps} / ${laps}`}/><Metric label="Checkpoints this lap" value={`${frame?.checkpoints ?? stats.checkpoints} / ${frame?.checkpointCount ?? stats.checkpointCount}`}/>
       <Metric label="Episodes completed" value={stats.episode.toLocaleString()}/><Metric label={frame ? 'Playback score' : 'Current training score'} value={frame ? frame.score.toFixed(0) : stats.currentScore.toFixed(0)}/>
@@ -164,6 +222,10 @@ function TrainingSession({ track, laps, config, onFrame, onFleet, onSave }: { tr
       <Metric label="Training race completion" value={stats.completion === null ? '—' : `${(stats.completion * 100).toFixed(1)}%`} detail="Includes exploratory actions"/>
       <Metric label="Exploration" value={`${(stats.epsilon * 100).toFixed(1)}%`}/><Metric label="Replay memory" value={stats.replaySize.toLocaleString()} detail={`${stats.steps.toLocaleString()} decisions collected`}/>
     </div>
+      </details>
+      <div className="training-actions">      <Button variant="outline" disabled={!stats.best || unavailable || comparing || stats.status === 'evaluating'} onClick={() => command({ type: 'evaluate' })}>Evaluate best · {stats.trainingTracks.length * 5} starts</Button>
+      <Button variant="outline" disabled={!stats.best || unavailable || comparing || stats.status==='evaluating'} onClick={()=>command({type:'validate'})}>Test all 5 tracks</Button>
+      </div>
     <div className="training-track-results"><h4>Latest evaluation by circuit</h4>{stats.trainingTracks.map(t=>{
       const result=stats.evaluations.find(r=>r.track===t),memory=stats.replayCounts.find(r=>r.track===t);
       return <div key={t}><strong>{TRACKS[t].name}</strong><span>{result ? `${(result.successRate*100).toFixed(0)}% completed · ${(result.meanProgress*100).toFixed(0)}% mean progress` : 'Waiting for evaluation'}</span>{result && <small>{Object.entries(result.runs.reduce<Record<string,number>>((counts,run)=>{counts[run.reason]=(counts[run.reason]??0)+1;return counts;},{})).map(([reason,count])=>`${reason}: ${count}/5`).join(' · ')}</small>}<small>{memory ? `${memory.count.toLocaleString()} experiences retained` : 'Single-track memory'}</small></div>;
@@ -172,9 +234,9 @@ function TrainingSession({ track, laps, config, onFrame, onFleet, onSave }: { tr
     {stats.validation && <section className="training-track-results" aria-label="Transfer check"><h4>Transfer check · model episode {stats.validation.episode}</h4>{stats.validation.results.map(result=><div key={result.track}><strong>{TRACKS[result.track].name} · {stats.trainingTracks.includes(result.track) ? 'Training track' : 'Held out'}</strong><span>{(result.successRate*100).toFixed(0)}% complete · {(result.meanProgress*100).toFixed(0)}% mean progress</span><small>{result.runs.filter(run=>!run.completed).map(run=>run.reason).join(' · ') || 'All five attempts completed'}</small></div>)}<small>Read-only evaluation. These held-out scores never select or update the model.</small></section>}
     <EvaluationMetrics evaluation={stats.evaluation}/>
     {!stats.trainingTracks.includes(track) && <p className="model-storage-note">This circuit is outside the training set. Run the shared best model here to test transfer; it has no evaluation score for this circuit.</p>}
-    {frame && <div className="training-live"><span>{stats.status === 'playing' || stats.status === 'playback-ended' ? 'BEST MODEL' : stats.status === 'evaluating' ? 'EVALUATION · NO EXPLORATION' : 'CURRENT ATTEMPT'}</span><strong>{frame ? ACTION_NAMES[frame.action] : 'Waiting'}</strong><label>Race progress<progress max={1} value={frame?.progress ?? 0}/><b>{((frame?.progress ?? 0) * 100).toFixed(1)}%</b></label></div>}
-    <label className="chart-filter">Chart circuit <select aria-label="Chart circuit" value={chartTrack} onChange={e=>setChartTrack(e.target.value)}><option value="all">All training circuits</option>{TRACKS.map((circuit,index)=><option key={index} value={index}>{circuit.name}</option>)}</select></label>
-    <div className="training-charts"><TrainingChart title="Score per episode" description="Lime: each attempt. Blue: rolling mean of 20." data={chartData} kind="score"/><TrainingChart title="Learning loss" description="Reward-prediction error; guided training also includes a demonstration loss. Lower loss alone does not mean better driving." data={chartData} kind="loss"/></div>
+      <details className="lab-disclosure"><summary>Reports every 100 episodes</summary>
+    <div className="training-checkpoints"><h4>Every 100 episodes</h4>{stats.milestones.length ? <Table><TableHeader><TableRow><TableHead>Episode</TableHead><TableHead>Best mean score</TableHead><TableHead>Model from</TableHead><TableHead>Eval success</TableHead></TableRow></TableHeader><TableBody>{stats.milestones.slice().reverse().map(m => <TableRow key={m.episode}><TableCell>{m.episode}</TableCell><TableCell>{m.best.toFixed(0)}</TableCell><TableCell>{m.bestEpisode}</TableCell><TableCell>{(m.completion * 100).toFixed(0)}%</TableCell></TableRow>)}</TableBody></Table> : <p>The first report appears after episode 100 and its evaluation.</p>}</div>
+      </details>
     <details className="comparison-controls"><summary>Controlled comparison · P1 and P2</summary>
       <p>Use single-track training to run this comparison. Four experiments × seeds 42, 1337, and 2026. Each run starts with random weights, the same training start, the same episode budget, and the same five evaluation poses. Adjacent experiments change one factor. Existing saves are retained; starting a comparison ends the current live run.</p>
       <label>Episodes per run<select value={budget} onChange={e => setBudget(Number(e.target.value))}><option value={100}>100 · short comparison</option><option value={400}>400</option><option value={1000}>1,000 · longer comparison</option></select></label>
@@ -182,15 +244,24 @@ function TrainingSession({ track, laps, config, onFrame, onFleet, onSave }: { tr
       {comparing && <p>Run {stats.comparisonRun}/12. Use Pause and Resume training above. Fastest is recommended; this may take a while.</p>}
       {report && <ComparisonResults report={report}/>}{reportNotice && <p>{reportNotice}</p>}
     </details>
+    </TabsContent>
+    <TabsContent value="models" className="lab-panel" keepMounted>
+      {modelsPanel}
+    {stats.preset !== 'adaptive' && <details className="model-storage-note"><summary>Experimental corner rewards</summary><p>Corner-aware rewards are experimental and did not consistently improve our controlled tests. Switching retains weights but clears old scores and experience. Guided warm-up is the alternative tested below.</p><Button variant="outline" disabled={unavailable || comparing} onClick={()=>command({type:'upgrade'})}>Use corner-aware rewards</Button></details>}
+    </TabsContent>
+    <TabsContent value="learn" className="lab-panel" keepMounted>
+      <h4 className="lab-panel-title">Inside the learner</h4>
+      <p className="lab-panel-intro">Follow a driving decision from sensors through the neural network, then see how rewards change its predictions.</p>
+    <LearningExplorer reading={reading} stats={stats} command={command}/>
     <div className="training-explanation"><details><summary>Rewards and inputs in this experiment</summary><dl>
       <div><dt>Finish a lap after all checkpoints</dt><dd>+1,000</dd></div><div><dt>Each checkpoint, once per lap</dt><dd>+{(1000 / stats.checkpointCount).toFixed(2)}</dd></div><div><dt>New forward progress</dt><dd>{rewardConfig.normalizedProgress ? '+750 / full lap' : '+3 / world unit'}</dd></div><div><dt>Extra speed reward</dt><dd>{rewardConfig.speedBonus ? 'Up to +1 / unit' : 'None'}</dd></div><div><dt>Off the road</dt><dd>−50 / second</dd></div><div><dt>Reverse progress</dt><dd>{rewardConfig.normalizedProgress ? '−750 / lap length' : '−3 / world unit'}</dd></div><div><dt>Time passing</dt><dd>−1 / second</dd></div>{stats.preset === 'adaptive' && <div><dt>Overspeed, edge proximity and misalignment</dt><dd>Continuous penalty</dd></div>}<div><dt>Failure or timeout</dt><dd>{stats.preset === 'adaptive' ? '−250' : '−100'}</dd></div>
       </dl><p>52 input slots include the 12 ray distances, speed and controls, relative road position and heading, map headings ahead, and off-road duration. New history inputs expose elapsed time, stalled time, signed progress, progress already rewarded, checkpoint count, relative distance to the next checkpoint, completed-lap fraction, and the requested lap count.</p><p>{rewardConfig.absolutePosition ? 'This comparison stage also uses X/Z and absolute lap-position features.' : 'X/Z and absolute lap-position features are masked to zero. Relative task progress remains available to help predict rewards. Recent net movement, window age and its threshold are included; the full rolling history is not.'} Local waypoint positions, road width and a braking-aware corner-speed estimate help plan turns. This is map-assisted driving, not a sensor-only agent.</p><p>Progress cannot earn points twice. Leaving the road for one second, moving more than three units beyond its edge, moving less than the selected minimum in one second, six seconds without forward progress, or reaching 90 seconds per requested lap ends an attempt. Normal playback starts at the finish line. Varied-start evaluations require a full circuit back to each test’s own starting position.</p>
       {frame && <p className="reward-now">Latest decision: safety {frame.reward.safety.toFixed(1)} · checkpoint {frame.reward.checkpoint.toFixed(1)} · progress {frame.reward.progress.toFixed(1)} · speed {frame.reward.speed.toFixed(1)} · off-road {frame.reward.offroad.toFixed(1)} · reverse {frame.reward.reverse.toFixed(1)} · time {frame.reward.time.toFixed(1)} · finish {frame.reward.finish} · failure {frame.reward.failure}</p>}</details>
       <details><summary>How evaluation and saving work</summary><p>Five fixed starts test the line, lateral and heading offsets, and two other positions around the circuit. Learning and exploration are off throughout evaluation. Best models are ranked by lap completion first, then mean reward across the selected circuits, with equal weight per circuit. Ties prefer better completion on the weakest circuit, then mean score.</p><p>Evaluations run after episode 1 and every 10 episodes. Best-score reports appear every 100 episodes. Evaluation uses the latest learner unless you press Evaluate best. Lap time is the average per lap in completed races; a dash means no completed lap. Off-road time averages all five runs.</p><p>In three-track mode, switching the viewed circuit does not interrupt learning or change its training set. Each selected circuit receives an equal share of replay-memory capacity and sampling probability. Loading a saved model instead starts a separate session with a fresh experience buffer. Refreshing preserves saved weights but not optimizer state or unfinished training.</p></details></div>
-    <div className="training-checkpoints"><h4>Every 100 episodes</h4>{stats.milestones.length ? <Table><TableHeader><TableRow><TableHead>Episode</TableHead><TableHead>Best mean score</TableHead><TableHead>Model from</TableHead><TableHead>Eval success</TableHead></TableRow></TableHeader><TableBody>{stats.milestones.slice().reverse().map(m => <TableRow key={m.episode}><TableCell>{m.episode}</TableCell><TableCell>{m.best.toFixed(0)}</TableCell><TableCell>{m.bestEpisode}</TableCell><TableCell>{(m.completion * 100).toFixed(0)}%</TableCell></TableRow>)}</TableBody></Table> : <p>The first report appears after episode 100 and its evaluation.</p>}</div>
-    <p className="model-storage-note">Everything runs in this browser. Hiding the tab pauses it. Circuit changes retain weights, optimizer, exploration and experience memory. In three-track mode the view can change without resetting the learner or replay group. Starting a fresh session or loading a saved model resets live experience memory. Best-model playback allows five continuous seconds off-road.</p>
+    </TabsContent>
   </>;
 }
+
 function EvaluationMetrics({ evaluation }: { evaluation: EvaluationSummary | null }) {
   return <section className="evaluation-metrics" aria-label="Evaluation metrics"><h4>Latest evaluation · five varied starts</h4><div className="training-metrics">
     <Metric label="Evaluation race completion" value={evaluation ? `${(evaluation.successRate * 100).toFixed(0)}%` : '—'} detail="No random actions"/>

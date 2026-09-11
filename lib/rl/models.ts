@@ -1,3 +1,4 @@
+import type { FeatureSettings } from './features.ts';
 import { TRACKS } from '../race.ts';
 import type { Weights } from './agent.ts';
 import { OBSERVATION_SIZE, OBSERVATION_VERSION, PRESETS, type Preset } from './config.ts';
@@ -8,6 +9,7 @@ export type Checkpoint = {
   version: 2; observationVersion: number; id: string; track: number; preset: Preset; seed: number;
   evaluations?: EvaluationSummary[];
   guided?: boolean;
+  features?: FeatureSettings;
   episode: number; trainedTracks: number[]; parentId: string | null; evaluation: EvaluationSummary | null; weights: Weights;
 };
 export type LegacyCheckpoint = { version: 1; track: number; episode: number; score: number; progress: number; completed: boolean; weights: Weights };

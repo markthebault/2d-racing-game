@@ -1,3 +1,4 @@
+import type { FeatureSettings } from './features.ts';
 import type { DecisionReading } from './insights.ts';
 import type { AgentFrame } from './environment.ts';
 import type { FleetFrame } from './batch.ts';
@@ -23,8 +24,8 @@ export type TrainingStats = {
   history: EpisodeMetric[]; milestones: Milestone[]; replaySize: number; message: string;
   preset: Preset; seed: number; evaluationCase: string; comparison: ComparisonReport | null; comparisonRun: number;
 };
-export type WorkerCommand = { type: 'init'; coach?: boolean; trainingTracks?: number[]; variedStarts?: boolean; laps?: number; track: number; checkpoint: StoredModel | null; preset?: Preset; seed?: number }
-  | { type: 'train' | 'resume' | 'pause' | 'play' | 'reset' | 'evaluate' | 'upgrade' | 'validate' }
+export type WorkerCommand = { type: 'init'; features?: FeatureSettings; coach?: boolean; trainingTracks?: number[]; variedStarts?: boolean; laps?: number; track: number; checkpoint: StoredModel | null; preset?: Preset; seed?: number }
+  | { type: 'train' | 'resume' | 'pause' | 'play' | 'restart-playback' | 'reset' | 'evaluate' | 'upgrade' | 'validate' }
   | { type: 'insights'; enabled: boolean }
   | { type: 'inspect'; fraction?: number; action?: number; restart?: boolean }
   | { type: 'compare'; episodes: number }
