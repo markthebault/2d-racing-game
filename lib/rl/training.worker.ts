@@ -1,3 +1,5 @@
+import { DecisionLab } from './decision-lab.ts';
+import type { DecisionReading } from './insights.ts';
 import { DrivingCoach } from './coach.ts';
 import { TRACKS } from '../race.ts';
 import { trainingStart, validateTrainingTracks } from './curriculum.ts';
@@ -13,6 +15,14 @@ import { sampleBatch, type RecordedRun, type Pose } from './batch.ts';
 const send = (message: WorkerMessage) => self.postMessage(message);
 const sleep = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
 const id = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+let insightsEnabled = false, lastInsight = 0;
+let decisionLab: DecisionLab | null = null;
+function clearDecisionLab() { decisionLab?.dispose(); decisionLab=null; send({type:'insight',reading:null}); }
+function previewDecision() {
+  const network=agent.inspect(environment.observe());
+  send({type:'insight',reading:{source:'preview',track:environment.track,episode:stats.episode,step:agent.steps,before:environment.frame(),after:null,network,action:network.values.indexOf(Math.max(...network.values)),exploratory:false,epsilon:agent.epsilon,guided:guidedUsed,bestValues:null,update:agent.lastUpdate}});
+  lastInsight=performance.now();
+}
 let playbackAgent: DQNAgent | null = null;
 let coach: DrivingCoach | null = null, coachEnabled = false;
 let agent: DQNAgent, bestAgent: DQNAgent, environment: DrivingEnvironment;
@@ -110,6 +120,7 @@ function publish() {
   else if (mode === 'train') stats.status = 'training';
   else if (mode === 'evaluate') stats.status = 'evaluating';
   stats.evaluationCase = evaluation ? `${TRACKS[evaluation.environment.track].name} · ${evaluation.index + 1}/5 · ${evaluation.label}` : '';
+  if(insightsEnabled && !decisionLab && mode !== 'train' && performance.now()-lastInsight>250)previewDecision();
   send({ type: 'stats', stats }); lastPublish = performance.now();
 }
 function show() { if (display === 'play') send({ type: 'frame', track: viewTrack, frame: playback!.frame() }); }
@@ -122,7 +133,9 @@ function beginEvaluation(useBest: boolean, resume: 'train' | 'idle', allTracks =
 }
 function setupRun(track: number, preset: Preset, seed: number) {
   coach?.dispose(); coach=null; agent?.dispose(); bestAgent?.dispose();
+  clearDecisionLab();
   agent = new DQNAgent(seed, preset === 'adaptive'); bestAgent = new DQNAgent(seed);
+  agent.captureLearning=insightsEnabled;
   viewTrack = track; if (!trainingTracks.length) trainingTracks = [track];
   if (trainingTracks.length > 1) agent.setTrainingTracks(trainingTracks);
   stats.preset = preset; startRandom = seededRandom(seed + 101); attempt = 0; environments.clear(); resetAttempt();
@@ -178,10 +191,16 @@ function finishEvaluation() {
 }
 function trainStep() {
   if (!trainedTracks.includes(environment.track)) trainedTracks.push(environment.track);
-  const action = agent.act(observation, true), result = environment.step(action);
+  const capture = insightsEnabled && performance.now()-lastInsight > 250;
+  const before = capture ? environment.frame() : null, network = capture ? agent.inspect(observation) : null;
+  const action = agent.act(observation, true), exploratory=agent.lastExploratory, result = environment.step(action);
   poses.push(recordPose());
   agent.remember({ track: environment.track, state: observation, action, reward: result.reward, next: result.observation, done: result.done });
   observation = result.observation; agent.train();
+  if(capture) {
+    const reading: DecisionReading={source:'training',track:environment.track,episode:stats.episode+1,step:agent.steps,before:before!,after:environment.frame(),network:network!,action,exploratory,epsilon:agent.epsilon,guided:guidedUsed,bestValues:null,update:agent.lastUpdate};
+    send({type:'insight',reading});lastInsight=performance.now();
+  }
   if (!result.done) return;
   stats.episode++; measuredEpisodes++; completedEpisodes += Number(environment.completed);
   const recent = [...stats.history.slice(-19).map(e => e.score), environment.score];
@@ -237,6 +256,20 @@ async function loop() {
 self.onmessage = async (event: MessageEvent<WorkerCommand>) => {
   const command = event.data;
   try {
+    if(initialized && !['inspect','insights','pause','speed','replay-speed'].includes(command.type))clearDecisionLab();
+    if(initialized && command.type==='insights') {
+      insightsEnabled=command.enabled;agent.captureLearning=command.enabled;clearDecisionLab();
+      if(command.enabled)previewDecision();return;
+    }
+    if(initialized && command.type==='inspect') {
+      if(command.action!==undefined && (!Number.isInteger(command.action)||command.action<0||command.action>8))throw new Error('Choose a valid driving action.');
+      if(command.fraction!==undefined && ![0,1/3,2/3].includes(command.fraction))throw new Error('Choose a valid walkthrough start.');
+      if(!paused)pausedMode=display!=='none'?display:mode;
+      paused=true;
+      if(!decisionLab || command.restart) { clearDecisionLab();decisionLab=new DecisionLab(agent,best?bestAgent:null,viewTrack,stats.preset,targetLaps,minDistance,command.fraction??0);send({type:'insight',reading:decisionLab.read()}); }
+      else { const chosen=command.action??decisionLab.read().action;send({type:'insight',reading:decisionLab.read(chosen,command.action!==undefined)}); }
+      stats.message='Walkthrough paused the session. Its frozen copy does not update your learner. Resume learning when ready.';publish();return;
+    }
     if (command.type === 'init') {
       if (initialized || booting) return;
       booting = true; await initializeTensorflow();
@@ -306,6 +339,6 @@ self.onmessage = async (event: MessageEvent<WorkerCommand>) => {
       const first = comparisonJobs.shift()!; setupRun(track, first.preset, first.seed);
       stats.comparison = { targetLaps, id: id(), track, budget: command.episodes, rows: [], complete: false }; stats.comparisonRun = 1;
       mode = 'train'; stats.status = 'training'; stats.message = 'Comparison run 1/12. Every run starts from random weights; saved models are retained.'; publish();
-    } else if (command.type === 'reset') { discard = true; mode = 'idle'; coach?.dispose(); agent?.dispose(); bestAgent?.dispose(); playbackAgent?.dispose(); }
+    } else if (command.type === 'reset') { discard = true; clearDecisionLab(); mode = 'idle'; coach?.dispose(); agent?.dispose(); bestAgent?.dispose(); playbackAgent?.dispose(); }
   } catch (error) { mode = 'idle'; paused = true; send({ type: 'error', message: error instanceof Error ? error.message : String(error) }); }
 };

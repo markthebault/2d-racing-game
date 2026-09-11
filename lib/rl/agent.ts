@@ -1,3 +1,4 @@
+import type { NetworkReading, UpdateReading } from './insights.ts';
 import * as tf from '@tensorflow/tfjs';
 import { ACTIONS, OBSERVATION_SIZE } from './environment.ts';
 
@@ -15,6 +16,9 @@ function network(seed: number) {
   return model;
 }
 export class DQNAgent {
+  captureLearning = false;
+  lastExploratory = false;
+  lastUpdate: UpdateReading | null = null;
   advanced: boolean;
   lessons: { state: number[]; action: number }[] = [];
   readonly online: tf.Sequential;
@@ -55,11 +59,20 @@ export class DQNAgent {
     this.random = seededRandom(seed); this.online = network(seed); this.target = network(seed + 10);
     this.target.setWeights(this.online.getWeights());
   }
-  clearReplay() { this.replay = []; this.cursor = 0; this.buckets.clear(); this.discardPending(); }
+  clearReplay() { this.lastUpdate = null; this.replay = []; this.cursor = 0; this.buckets.clear(); this.discardPending(); }
   get epsilon() { if(this.lessons.length) return Math.max(.04,.15*Math.exp(-this.steps/20000)); if(!this.advanced) return Math.max(.04,Math.exp(-this.steps/16000)); return Math.max(.08, Math.exp(-this.steps / 40000), .3 * Math.exp(-(this.steps-this.explorationRestart)/8000)); }
+  inspect(state: number[]): NetworkReading {
+    return tf.tidy(() => {
+      let current = tf.tensor2d([state]);
+      const layers = this.online.layers.map(layer => { current = layer.apply(current) as tf.Tensor2D; return Array.from(current.dataSync()); });
+      return { inputs: [...state], hidden: layers.slice(0, 2), values: layers[2] };
+    });
+  }
   act(state: number[], explore = false) {
+    this.lastExploratory = false;
     if (explore && this.random() < this.epsilon) {
       // Favor movement when exploring. Uniform braking at rest otherwise fills memory with stationary failures.
+      this.lastExploratory = true;
       const pedal = this.random(), bank = pedal < (this.advanced ? .55 : .7) ? 0 : pedal < (this.advanced ? .8 : .9) ? 1 : 2;
       return bank * 3 + Math.floor(this.random() * 3);
     }
@@ -85,6 +98,7 @@ export class DQNAgent {
       return pool[Math.floor(this.random() * pool.length)];
     });
     const demonstrations=this.lessons.length ? Array.from({length:16},()=>this.lessons[Math.floor(this.random()*this.lessons.length)]) : [];
+    let captured: UpdateReading | null = null;
     const loss = tf.tidy(() => {
       const states = tf.tensor2d(batch.map(e => e.state)), next = tf.tensor2d(batch.map(e => e.next));
       const actions = tf.oneHot(tf.tensor1d(batch.map(e => e.action), 'int32'), ACTIONS.length);
@@ -92,6 +106,13 @@ export class DQNAgent {
       const bestNext = (this.online.predict(next) as tf.Tensor2D).argMax(1);
       const future = (this.target.predict(next) as tf.Tensor2D).mul(tf.oneHot(bestNext, ACTIONS.length)).sum(1);
       const target = tf.tensor1d(batch.map(e => e.reward * .01)).add(future.mul(tf.tensor1d(batch.map(e => e.done ? 0 : e.discount ?? .995))));
+      if (this.captureLearning) {
+        const predicted = (this.online.predict(states) as tf.Tensor2D).mul(actions).sum(1);
+        const predictions = Array.from(predicted.dataSync()), targets = Array.from(target.dataSync());
+        const demoLoss = demonstrations.length ? tf.losses.softmaxCrossEntropy(tf.oneHot(tf.tensor1d(demonstrations.map(row=>row.action),'int32'),ACTIONS.length),this.online.predict(tf.tensor2d(demonstrations.map(row=>row.state))) as tf.Tensor2D).mean().dataSync()[0] : 0;
+        captured = { update: this.updates + 1, tdLoss: tf.losses.huberLoss(target,predicted).mean().dataSync()[0], demonstrationLoss: demoLoss * 5, batchSize: batch.length,
+          samples: batch.slice(0,8).map((item,i)=>({track:item.track??null,action:item.action,reward:item.reward,terminal:item.done,prediction:predictions[i],target:targets[i],after:predictions[i]})) };
+      }
       const objective = () => {
         const prediction = (this.online.apply(states) as tf.Tensor2D).mul(actions).sum(1);
         let loss=tf.losses.huberLoss(target, prediction).mean();
@@ -112,6 +133,12 @@ export class DQNAgent {
       return cost.dataSync()[0];
     });
     if (!Number.isFinite(loss)) throw new Error('Training became unstable. Start a new training session.');
+    if (captured) {
+      const reading = captured as UpdateReading;
+      tf.tidy(() => { const q = this.online.predict(tf.tensor2d(batch.slice(0,8).map(item=>item.state))) as tf.Tensor2D;
+        const values = q.arraySync(); reading.samples.forEach((sample,i)=>sample.after=values[i][sample.action]); });
+      this.lastUpdate = reading;
+    }
     this.loss = loss; this.updates++;
     if(!this.advanced) { if(this.updates%200===0)this.target.setWeights(this.online.getWeights()); }
     else tf.tidy(()=>{ const online=this.online.getWeights(); this.target.setWeights(this.target.getWeights().map((weight,i)=>weight.mul(.995).add(online[i].mul(.005)))); });

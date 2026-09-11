@@ -1,3 +1,4 @@
+import type { DecisionReading } from './insights.ts';
 import type { AgentFrame } from './environment.ts';
 import type { FleetFrame } from './batch.ts';
 import type { Preset } from './config.ts';
@@ -24,6 +25,8 @@ export type TrainingStats = {
 };
 export type WorkerCommand = { type: 'init'; coach?: boolean; trainingTracks?: number[]; variedStarts?: boolean; laps?: number; track: number; checkpoint: StoredModel | null; preset?: Preset; seed?: number }
   | { type: 'train' | 'resume' | 'pause' | 'play' | 'reset' | 'evaluate' | 'upgrade' | 'validate' }
+  | { type: 'insights'; enabled: boolean }
+  | { type: 'inspect'; fraction?: number; action?: number; restart?: boolean }
   | { type: 'compare'; episodes: number }
   | { type: 'track'; track: number; laps?: number }
   | { type: 'plan'; tracks: number[]; variedStarts: boolean }
@@ -32,7 +35,7 @@ export type WorkerCommand = { type: 'init'; coach?: boolean; trainingTracks?: nu
   | { type: 'skip-replay' }
   | { type: 'replay-speed'; speed: number }
   | { type: 'speed'; speed: number };
-export type WorkerMessage = { type: 'stats'; stats: TrainingStats } | { type: 'frame'; frame: AgentFrame; track: number }
+export type WorkerMessage = { type: 'insight'; reading: DecisionReading | null } | { type: 'stats'; stats: TrainingStats } | { type: 'frame'; frame: AgentFrame; track: number }
   | { type: 'fleet'; frame: FleetFrame | null }
   | { type: 'checkpoint'; checkpoint: Checkpoint } | { type: 'report'; report: ComparisonReport } | { type: 'error'; message: string };
 export const emptyTrainingStats = (): TrainingStats => ({ coachEnabled: false, coachSamples: 0, coachUpdates: 0, coachLoss: null, validation: null, trainingTracks: [], trainingTrack: 0, variedStarts: false, startFraction: 0, evaluations: [], replayCounts: [], minDistance: 1, lastPlayback: null, backgroundLearning: false, queuedGroups: 0, skippedGroups: 0, playbackEpisode: null, targetLaps: 1, completedLaps: 0, checkpoints: 0, checkpointCount: 4, track: 0, batchCount: 0, trainedTracks: [], pausedActivity: '', currentScore: 0, status: 'loading', episode: 0, steps: 0, updates: 0, epsilon: 1, loss: null, mean: null, completion: null, best: null,
