@@ -1,4 +1,6 @@
 'use client';
+import { LearningExplorer } from './learning-explorer';
+import type { DecisionReading } from '../lib/rl/insights';
 import { useEffect, useRef, useState } from 'react';
 // eslint-disable-next-line import/default -- Vite provides the asset URL as this query module's default export.
 import trainingWorkerUrl from '../lib/rl/training.worker.ts?worker&url';
@@ -63,6 +65,7 @@ function TrainingSession({ track, laps, config, onFrame, onFleet, onSave }: { tr
   const initialLaps = useRef(laps);
   const fleetUiTime = useRef(0);
   useEffect(() => { callbacks.current = { onFrame, onFleet, onSave, track, laps }; }, [onFrame, onFleet, onSave, track, laps]);
+  const [reading, setReading] = useState<DecisionReading | null>(null);
   const [fleet, setFleet] = useState<FleetFrame | null>(null);
   const [stats, setStats] = useState(emptyTrainingStats), [frame, setFrame] = useState<AgentFrame | null>(null);
   const [speed, setSpeed] = useState(4), [budget, setBudget] = useState(100);
@@ -81,6 +84,7 @@ function TrainingSession({ track, laps, config, onFrame, onFleet, onSave }: { tr
     instance.onmessage = (event: MessageEvent<WorkerMessage>) => {
       if (!active) return;
       const message = event.data;
+      if (message.type === 'insight') setReading(message.reading);
       if (message.type === 'stats' && message.stats.track === callbacks.current.track && message.stats.targetLaps === callbacks.current.laps) setStats(message.stats);
       if (message.type === 'frame' && message.track === callbacks.current.track && message.frame.targetLaps === callbacks.current.laps) { setFrame(message.frame); callbacks.current.onFrame(message.frame); }
       if (message.type === 'fleet' && (!message.frame || message.frame.track === callbacks.current.track)) {
@@ -114,6 +118,7 @@ function TrainingSession({ track, laps, config, onFrame, onFleet, onSave }: { tr
   const bestResults = stats.best?.evaluations ?? [];
   const sharedScore = bestResults.length ? bestResults.reduce((sum,r)=>sum+r.meanScore,0)/bestResults.length : bestEval?.meanScore;
   return <>
+    <LearningExplorer reading={reading} stats={stats} command={command}/>
     <fieldset className="training-plan">
       <legend>Training circuits</legend>
       <label><input type="checkbox" checked={multi} onChange={e=>setMulti(e.target.checked)}/> Train across three tracks</label>

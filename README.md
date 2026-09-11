@@ -81,6 +81,31 @@ The demonstration term is present only when instructor examples are available. D
 
 An **episode** is one driving attempt, ending after the requested laps, a failure or timeout. It is different from a gradient update: the 4,000 warm-up updates are not 4,000 driving episodes. Warm-up loss measures action-label prediction; RL loss combines reward-value error and the demonstration term. Neither is driving accuracy. **Evaluation success** measures the fraction of complete races, including every requested lap. Training scores include exploration and should be filtered by circuit when comparing progress.
 
+### See how the AI learns
+
+Open **Train AI → See how the AI learns** for a visual explanation connected to the real learner. Three views keep the explanation manageable:
+
+![Live neural-network view with grouped inputs, two 64-neuron activation grids and nine action values](docs/screenshots/learning-network.png)
+
+- **Decision** shows a road close-up with the actual ray intersections, the nine action values, whether the action came from the network or random exploration, and the points actually earned by that step. Switch to the whole-circuit view for context. Before RL has trained, outputs are labelled as uncalibrated action scores.
+- **Network** groups the 52 inputs and shows all 64 neurons in each hidden layer as compact activation grids, followed by the nine outputs. Click an input group and expand its details to inspect the normalized values. Brightness is relative within each layer. It shows activation, not feature importance or a causal explanation. Structural arrows avoid drawing thousands of overlapping connections.
+- **Learning update** shows eight of the actual 32 replay experiences sampled for an optimizer update. Select one to compare its predicted action value before the update, its learning target, and its value afterward. Expanded details separate the reward-value loss from the weighted demonstration loss. These samples can come from earlier decisions and different training circuits. The displayed batch stays still while learning continues; use **Refresh sampled update** to inspect a newer one.
+
+[View the decision walkthrough](docs/screenshots/learning-decision.png).
+
+**Walk through a run** pauses learning and playback, copies the current learner into an isolated environment on the viewed circuit, and freezes its weights. Choose the finish line or a position one-third/two-thirds around the circuit. Select a pedal/steering action, or accept the network's choice, then advance by 0.1 simulated seconds. The copy uses the real physics and reward rules but never contributes experiences or gradient updates. A manual choice is labelled separately from a network choice. **Resume learning** discards the copy and continues the original session. Closing the walkthrough leaves the session paused until resumed.
+
+If a saved best model exists, the Network view can compare its action values with the learner's using exactly the same inputs. This is a comparison of preferences in one situation, not a full-race benchmark. Use the existing evaluation and playback controls to compare driving success.
+
+Live diagnostics are opt-in and sampled at most four times per second. Opening the panel does not consume the training random-number stream or alter gradient results. During guided warm-up the panel explains instructor learning; replay-update data appears only after actual RL updates. The views use real readings rather than illustrative, fabricated training numbers.
+
+Browser and worker checks for this feature, after building and starting the preview:
+
+```sh
+node scripts/insights-browser.mjs
+node scripts/insights-worker.mjs
+```
+
 ### Fifty-car replays
 
 Each episode is one driving attempt. The circuit stays empty while attempts 1–50 are recorded, then the recorded cars replay their actual paths together, filtered to the viewed circuit at real-time speed. A separate replay-speed control offers 2×, 4× and 8×. Each car stops at its own endpoint; failed cars dim while longer runs continue. Learning continues during the replay, including scheduled evaluations. The next group shows attempts 51–100, then 101–150, and so on. Evaluations do not enter these recordings.
