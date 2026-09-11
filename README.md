@@ -56,49 +56,72 @@ The debug menu also shows accelerator and brake/reverse positions, car position 
 
 ## Reinforcement learning in the browser
 
-Choose **Train AI → Start training**. Training runs locally in JavaScript using TensorFlow.js in a Web Worker with the CPU backend. No Python training server, API key, GPU, cross-origin isolation, or external model download is required. Start with Park Oval and use Fastest for long runs. Lower speeds let you watch individual attempts; evaluation runs as quickly as the device allows and playback runs in real time.
+Choose **Train AI → Start training**. Training runs locally in JavaScript using TensorFlow.js in a Web Worker with the CPU backend. No Python training server, API key, GPU, cross-origin isolation, or external model download is required. Start with Park Oval and use Fastest for long runs. Training speed changes how quickly attempts are collected; best-model playback runs in real time.
 
-Pause retains weights, optimizer state, replay memory, the current attempt, and any partial evaluation in this tab. Run best model performs inference without updating the learner. Resume training continues the preserved learning session. Hiding the tab pauses the worker. Switching circuits, creating another session, or refreshing ends the live session; saved model weights remain available.
+Pause retains weights, optimizer state, experience memory, the current attempt, evaluation, and group replay position in this tab. Run best model drives a frozen snapshot while the learner continues training independently. Playback experiences never enter the learning buffer. Pause all and Resume all control learning and playback together. Hiding the tab pauses the worker. Creating another session or refreshing ends the live session; saved model weights remain available.
+
+### Fifty-car replays
+
+Each episode is one driving attempt. The circuit stays empty while attempts 1–50 are recorded, then all 50 cars replay their actual paths together at real-time speed. A separate replay-speed control offers 2×, 4× and 8×. Each car stops at its own endpoint; failed cars dim while longer runs continue. Learning continues during the replay, including scheduled evaluations. The next group shows attempts 51–100, then 101–150, and so on. Evaluations do not enter these recordings.
+
+The panel shows the recording count, replay time and number of cars still driving. Pause all freezes both learning and replay; Skip this replay advances the display without changing training. Run best model remains available and replaces the group display. The display retains its active group and up to two waiting groups, plus the group being recorded. If learning outruns playback, older waiting groups are replaced by newer ones; the UI reports skipped groups. Recordings stay in memory, not browser storage. Three.js renders the fleet with instanced car parts.
 
 ### Models across circuits
 
+Select another circuit to continue with the **same live learner**, including its optimizer, experience memory, exploration level and total episode count. The current weights receive a fresh evaluation on the destination circuit, and active training then resumes there automatically. A paused session stays ready until resumed. Training-track history lists every circuit used. The source checkpoint remains saved under its own ID; destination checkpoints use a new ID and only destination evaluation scores.
+
+Each track change discards the unfinished driving attempt and its partial visual group, then collects a new group of 50 on the destination. Previously collected learning experiences remain available. Switching during a controlled comparison ends that comparison and retains its completed rows, so subsequent training cannot mix tracks into its fixed-track report.
+
 Open **Models & experiments**, choose any saved model, then **Load on [selected circuit]**. Models are not restricted to their training track. Loading copies the weights, clears the source evaluation score, and runs the five-start evaluation on the selected circuit. You can play that model there or continue training it with a fresh optimizer and replay buffer. The source save remains unchanged; fine-tuned copies retain their parent ID and training-track history.
 
-Version 1 models remain in their original browser-storage keys. Loading one adds six zero-weight input rows to its first layer, preserving its original predictions under the corrected-baseline observations. New history features can acquire weights during subsequent training. These older models retain their position-aware baseline preset; they do not silently become local-input models. Incompatible saves are not overwritten.
+Version 1 models remain in their original browser-storage keys. Loading one adds eight zero-weight input rows to its first layer, preserving its original predictions under the corrected-baseline observations. New history features can acquire weights during subsequent training. These older models retain their position-aware baseline preset; they do not silently become local-input models. Incompatible saves are not overwritten.
 
-New checkpoints use observation/model version 2 and are saved by model ID, not a single slot per circuit. Experiment preset, seed, parent, trained tracks, episode and target evaluation travel with the weights. Browser storage failures are reported and the current page retains the in-memory models. Different browsers and origins have separate libraries. Optimizer state, replay memory and unfinished comparisons are not persisted. Completed comparison rows are persisted after each run.
+New checkpoints use observation version 3 and model format version 2 and are saved by model ID, not a single slot per circuit. Experiment preset, seed, parent, trained tracks, episode and target evaluation travel with the weights. Browser storage failures are reported and the current page retains the in-memory models. Different browsers and origins have separate libraries. Optimizer state, replay memory and unfinished comparisons are not persisted. Completed comparison rows are persisted after each run.
 
 Successful loading does not imply successful driving on a different circuit. Transfer performance is measured on the destination track.
 
 ### Inputs and shared physics
 
-The network has 34 input slots. The original 28 slots contain twelve normalized ray distances, speed, smoothed steering, accelerator, brake, signed lateral road offset, relative heading sine/cosine, off-road state, normalized X/Z, absolute lap-position sine/cosine, relative map headings 5/12/24 world units ahead, and off-road duration.
+The network has 36 input slots. The original 28 slots contain twelve normalized ray distances, speed, smoothed steering, accelerator, brake, signed lateral road offset, relative heading sine/cosine, off-road state, normalized X/Z, absolute lap-position sine/cosine, relative map headings 5/12/24 world units ahead, and off-road duration.
 
-Six additional slots expose reward and termination history: elapsed time, stalled time, signed accumulated progress, distance back to the furthest rewarded progress, checkpoint count, and signed relative distance to the next checkpoint. Signed progress and recovery distance use bounded, invertible normalization. The **Local inputs** preset masks the four absolute X/Z and lap-position slots to zero; relative task progress remains available. Road-heading lookahead is still map knowledge, so this is map-assisted rather than sensor-only driving.
+Eight additional slots expose reward and termination history: elapsed time, stalled time, signed accumulated progress, distance back to the furthest rewarded progress, checkpoint count, signed relative distance to the next checkpoint, completed-lap fraction, and requested lap count. Signed progress and recovery distance use bounded, invertible normalization. The **Local inputs** preset masks the four absolute X/Z and lap-position slots to zero; relative task progress remains available. Road-heading lookahead is still map knowledge, so this is map-assisted rather than sensor-only driving.
 
 The nine actions combine accelerate/coast/brake with left/straight/right steering. Decisions occur every 0.1 simulated seconds, each advancing six 1/60-second steps through the same progressive steering and vehicle dynamics as manual driving.
+
+### Checkpoints and multiple laps
+
+Choose 1–10 laps in the paddock before or during AI training. Training, best-model playback, five-start evaluation, and the 50-car recordings all use that race distance. Changing it restarts the unfinished attempt and visual group, clears destination scores, and evaluates again while retaining the learner and experience memory.
+
+Cyan lines marked CP 1, CP 2, and so on divide each circuit. Easy has four checkpoints worth 250 points each, medium six worth 166⅔ each, and hard eight worth 125 each. These interior checkpoints share 1,000 points per lap. Crossing the finish line after all of them adds another 1,000 points. The existing progress rewards and penalties still apply.
+
+Checkpoints must be crossed forward, on-road, in order, with enough valid driving progress. A checkpoint cannot pay twice in the same lap. Only completing that lap unlocks its checkpoints for the next one. Three laps therefore offer 3,000 checkpoint points and 3,000 finish bonuses, plus progress rewards and penalties. Passing the finish line after lap one or two does not end a three-lap attempt.
+
+The last two observation inputs encode completed-lap fraction and requested lap count. Older 34-input models load with two zero-weight rows added, retain learned weights, and receive fresh evaluation scores under these rules. Completion metrics now mean the entire requested race; successful mean lap time divides completed-race time by its lap count. Varied-start evaluations place their checkpoint sequence relative to each test start and require the full requested distance back to that start.
 
 ### Default rewards
 
 | Event | Local-input preset reward |
 | --- | ---: |
-| Full forward circuit through three checkpoints | +1,000 |
+| Each full forward lap after all its checkpoints | +1,000 |
 | New forward road progress | +750 spread over one track length |
+| Each checkpoint, once per lap | +1,000 divided by checkpoint count |
 | Extra speed bonus | None |
 | Off-road travel | −50 per simulated second |
 | Reverse road progress | −750 per track length |
 | Time | −1 per simulated second |
 | Failure or timeout | −100 |
 
-Forward progress uses a high-water mark and is capped to one circuit's distance. Driving the same segment repeatedly cannot earn repeated progress points. Off-road travel earns no progress. Time penalties use actual physics time, including partial terminal decisions. Episodes end after a full circuit, one continuous second off-road, moving more than three units beyond the road edge, six seconds without forward progress, or 90 simulated seconds. Road state is measured at the car center.
+Forward progress uses a high-water mark and is capped to the requested race distance. Driving the same segment repeatedly cannot earn repeated progress points. Off-road travel earns no progress. Time penalties use actual physics time, including partial terminal decisions. Episodes end after the requested number of full laps, one continuous second off-road, moving more than three units beyond the road edge, six seconds without forward progress, or 90 simulated seconds per requested lap. Road state is measured at the car center.
 
 Normal training and playback start at the finish line. Evaluation starts elsewhere require a full loop back to that start, not a shorter run to the painted line. Checkpoints are relative to the starting position.
+
+**Run best model** allows five continuous seconds off-road to recover. Its distance-from-road cutoff is disabled, and stalled time cannot shorten that off-road grace period. Returning to the road resets the grace period. The time limit of 90 seconds per requested lap still applies. Training and five-start evaluations retain the stricter one-second and distance limits, so evaluation scores remain comparable.
 
 ### Evaluation and best models
 
 Every evaluation uses the same five poses: normal start line, left/right offsets of 0.8 units with heading offsets of 0.10 radians, and starts one-third/two-thirds around the circuit with smaller offsets. Exploration and gradient updates are disabled. These tests are independent of the learner's random-number stream.
 
-The dashboard separates exploratory training completion from evaluation completion. Evaluation reports success rate across five runs, mean progress, mean off-road time across all runs, successful lap time, and individual attempts. If no lap finishes, lap time is shown as unavailable, not zero. Evaluation occurs after episode 1, every ten episodes, and at the end of a comparison budget. You can also evaluate the saved best model explicitly.
+The dashboard separates exploratory training completion from evaluation completion. Evaluation reports success rate across five runs, mean progress, mean off-road time across all runs, successful lap time, and individual attempts. If no full race finishes, lap time is shown as unavailable, not zero. Evaluation occurs after episode 1, every ten episodes, and at the end of a comparison budget. You can also evaluate the saved best model explicitly.
 
 Within one preset and circuit, best selection prioritizes completion rate, then mean reward. Reports every 100 episodes contain the best evaluation score and success rate. Five fixed poses are a small repeatable evaluation suite, not a guarantee of robustness to every start or unseen layout.
 
@@ -125,7 +148,13 @@ node --experimental-strip-types scripts/train-smoke.mjs 100 0
 # All four stages, three seeds, identical evaluation starts; optional JSON output.
 node --experimental-strip-types scripts/compare-training.mjs 400 0 /tmp/comparison.json
 # After npm run build, test the actual bundled worker and cross-track transfer.
-node scripts/worker-smoke.mjs
+node --experimental-strip-types scripts/worker-smoke.mjs
+# Chromium UI checks against the running local/Tailscale build.
+npx playwright install --with-deps chromium
+node scripts/browser-smoke.mjs
+# Check checkpoint counts and changing AI race distance.
+node scripts/checkpoints-browser.mjs
+# Override the default URL with RACING_URL if needed.
 ```
 
-Checks cover reward history, normalization, full laps from varied starts on all circuits, checkpoint exploits, evaluation aggregation, legacy prediction preservation, inference and fine-tuning across tracks, tensor cleanup, and worker pause/play/resume and comparison scheduling. The worker smoke check uses Node with browser-like globals; it is not a browser UI test.
+Checks cover reward history, normalization, full laps from varied starts on all circuits, checkpoint exploits, evaluation aggregation, legacy prediction preservation, inference and fine-tuning across tracks, tensor cleanup, five-second playback recovery, fleet interpolation and worker scheduling. The separate Chromium check trains two real groups of 50, exercises replay pause/resume and skipping, checks live learner retention across all three tracks, runs best-model playback, and checks mobile overflow and browser errors. These workflow checks do not establish policy convergence or guarantee successful laps on unseen circuits.

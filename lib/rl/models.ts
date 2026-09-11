@@ -13,7 +13,12 @@ export const modelKey = (model: StoredModel) => model.version === 1 ? `pocket-ci
 export function migrateModel(saved: StoredModel): Checkpoint {
   if (!saved || !Number.isInteger(saved.track) || saved.track < 0 || saved.track > 2 || !Number.isInteger(saved.episode) || saved.episode < 0) throw new Error('Invalid saved model metadata.');
   if (saved.version === 2) {
-    if (saved.observationVersion !== OBSERVATION_VERSION || !PRESETS[saved.preset] || !saved.id || !Number.isInteger(saved.seed) || !Array.isArray(saved.trainedTracks) || saved.trainedTracks.some(t => !Number.isInteger(t) || t < 0 || t > 2)) throw new Error('Incompatible saved model.');
+    if (![2, OBSERVATION_VERSION].includes(saved.observationVersion) || !PRESETS[saved.preset] || !saved.id || !Number.isInteger(saved.seed) || !Array.isArray(saved.trainedTracks) || saved.trainedTracks.some(t => !Number.isInteger(t) || t < 0 || t > 2)) throw new Error('Incompatible saved model.');
+    if (saved.observationVersion === 2) {
+      if (saved.weights?.[0]?.shape?.[0] !== 34 || saved.weights[0].values.length !== 34 * 64) throw new Error('Incompatible saved weights.');
+      const weights = saved.weights.map((w, i) => i === 0 ? { shape: [OBSERVATION_SIZE, 64], values: [...w.values, ...Array(2 * 64).fill(0)] } : { shape: [...w.shape], values: [...w.values] });
+      return { ...saved, observationVersion: OBSERVATION_VERSION, evaluation: null, weights };
+    }
     return saved;
   }
   if (saved.version !== 1 || saved.weights?.[0]?.shape?.[0] !== 28 || saved.weights[0].shape[1] !== 64 || saved.weights[0].values?.length !== 28 * 64) throw new Error('Unsupported legacy model.');

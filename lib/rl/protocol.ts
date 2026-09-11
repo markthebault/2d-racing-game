@@ -1,4 +1,5 @@
 import type { AgentFrame } from './environment.ts';
+import type { FleetFrame } from './batch.ts';
 import type { Preset } from './config.ts';
 import type { EvaluationSummary } from './evaluation.ts';
 import type { Checkpoint, StoredModel } from './models.ts';
@@ -6,19 +7,26 @@ export type { Checkpoint } from './models.ts';
 export type EpisodeMetric = { episode: number; score: number; mean: number; loss: number | null; progress: number; completed: boolean };
 export type Milestone = { episode: number; best: number; bestEpisode: number; completion: number };
 export type ComparisonRow = { preset: Preset; seed: number; episodes: number; steps: number; evaluation: EvaluationSummary; modelId: string };
-export type ComparisonReport = { id: string; track: number; budget: number; rows: ComparisonRow[]; complete: boolean };
-export type TrainingStatus = 'loading' | 'ready' | 'training' | 'evaluating' | 'paused' | 'playing' | 'playback-ended' | 'error';
+export type ComparisonReport = { targetLaps?: number; id: string; track: number; budget: number; rows: ComparisonRow[]; complete: boolean };
+export type TrainingStatus = 'loading' | 'ready' | 'training' | 'evaluating' | 'paused' | 'playing' | 'replaying' | 'playback-ended' | 'error';
 export type TrainingStats = {
+  lastPlayback: { episode: number; score: number; reason: string; completedLaps: number; targetLaps: number } | null;
+  backgroundLearning: boolean; queuedGroups: number; skippedGroups: number; playbackEpisode: number | null;
+  targetLaps: number; completedLaps: number; checkpoints: number; checkpointCount: number; track: number; batchCount: number; trainedTracks: number[]; pausedActivity: string; currentScore: number;
   status: TrainingStatus; episode: number; steps: number; updates: number; epsilon: number; loss: number | null;
   mean: number | null; completion: number | null; best: Omit<Checkpoint, 'weights'> | null; evaluation: EvaluationSummary | null;
   history: EpisodeMetric[]; milestones: Milestone[]; replaySize: number; message: string;
   preset: Preset; seed: number; evaluationCase: string; comparison: ComparisonReport | null; comparisonRun: number;
 };
-export type WorkerCommand = { type: 'init'; track: number; checkpoint: StoredModel | null; preset?: Preset; seed?: number }
-  | { type: 'train' | 'pause' | 'play' | 'reset' | 'evaluate' }
+export type WorkerCommand = { type: 'init'; laps?: number; track: number; checkpoint: StoredModel | null; preset?: Preset; seed?: number }
+  | { type: 'train' | 'resume' | 'pause' | 'play' | 'reset' | 'evaluate' }
   | { type: 'compare'; episodes: number }
+  | { type: 'track'; track: number; laps?: number }
+  | { type: 'skip-replay' }
+  | { type: 'replay-speed'; speed: number }
   | { type: 'speed'; speed: number };
-export type WorkerMessage = { type: 'stats'; stats: TrainingStats } | { type: 'frame'; frame: AgentFrame }
+export type WorkerMessage = { type: 'stats'; stats: TrainingStats } | { type: 'frame'; frame: AgentFrame; track: number }
+  | { type: 'fleet'; frame: FleetFrame | null }
   | { type: 'checkpoint'; checkpoint: Checkpoint } | { type: 'report'; report: ComparisonReport } | { type: 'error'; message: string };
-export const emptyTrainingStats = (): TrainingStats => ({ status: 'loading', episode: 0, steps: 0, updates: 0, epsilon: 1, loss: null, mean: null, completion: null, best: null,
+export const emptyTrainingStats = (): TrainingStats => ({ lastPlayback: null, backgroundLearning: false, queuedGroups: 0, skippedGroups: 0, playbackEpisode: null, targetLaps: 1, completedLaps: 0, checkpoints: 0, checkpointCount: 4, track: 0, batchCount: 0, trainedTracks: [], pausedActivity: '', currentScore: 0, status: 'loading', episode: 0, steps: 0, updates: 0, epsilon: 1, loss: null, mean: null, completion: null, best: null,
   evaluation: null, history: [], milestones: [], replaySize: 0, message: 'Preparing the learning engine…', preset: 'local', seed: 42, evaluationCase: '', comparison: null, comparisonRun: 0 });

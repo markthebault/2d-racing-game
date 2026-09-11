@@ -194,6 +194,13 @@ body {
 .driver-mode button[aria-pressed=true] { background:#daef8c; color:#1b291e; }
 .ai-hidden { display:none; }
 .training-lab { border-top:1px solid #405044; padding:24px; color:#e8efe2; background:#18251e; }
+.batch-summary { display:flex; flex-direction:column; gap:10px; margin:16px 0; padding:16px; background:#243429; border:1px solid #536647; border-radius:10px; font-size:13px; }
+.batch-summary strong { color:#daef8c; font-size:16px; }
+.batch-summary small { color:#b9c5b2; line-height:1.6; }
+.batch-summary progress { width:100%; height:5px; accent-color:#daef8c; }
+.batch-summary label { display:flex; align-items:center; justify-content:space-between; color:#b9c5b2; }
+.batch-summary select { padding:4px 12px; color:#e8efe2; background:#19251f; border:1px solid #52644e; border-radius:5px; }
+.fleet-caption { position:absolute; top:16px; left:16px; right:16px; background:#17281ee8; color:#daef8c; padding:12px 16px; border:1px solid #72845b; border-radius:8px; font:12px monospace; pointer-events:none; }
 .training-header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
 .training-header .eyebrow { display:flex; gap:8px; align-items:center; font-size:12px; }
 .training-header h3 { font-size:25px; margin:8px 0; letter-spacing:-.7px; }
@@ -243,6 +250,12 @@ body {
 @media(min-width:1300px) {
   .app-shell.learning-mode { max-width:2100px; padding-right:484px; }
   .learning-mode .workspace { grid-template-columns:220px minmax(0,1fr); gap:24px; }
+  .learning-mode .setup,.learning-mode .track-copy { min-width:0; }
+  .learning-mode .track-option { min-width:0; gap:8px!important; padding:10px!important; }
+  .learning-mode .track-option .track-map { width:46px!important; flex-shrink:0; }
+  .learning-mode .track-copy strong { font-size:13px; white-space:normal; }
+  .learning-mode .selection-dot { display:none; }
+  .learning-mode .debug-dock { top:24px; }
   .learning-mode .training-lab { position:fixed; top:112px; right:20px; bottom:20px; width:440px; padding:18px; overflow:auto; overscroll-behavior:contain; border:1px solid #4c5c4d; border-radius:10px; z-index:20; scrollbar-color:#65775f #19251f; }
   .learning-mode .training-header h3 { font-size:22px; }
   .learning-mode .training-metrics { grid-template-columns:1fr 1fr; }

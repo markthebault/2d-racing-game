@@ -3,6 +3,9 @@ import * as THREE from 'three';
 import { TRACKS, ROAD_WIDTH, ROAD_EDGE_OFFSET, offsetTrackPoint, trackEdges, trackBounds, sampleTrack, nearestPoint, advanceProgress, type Progress } from './race';
 import { senseTrack, type EdgeSegment, type RayReading } from './sensors';
 import { SensorOverlay } from './sensor-overlay';
+import { CHECKPOINT_COUNTS } from './rl/config';
+import { GhostFleet } from './ghost-fleet';
+import type { FleetFrame } from './rl/batch';
 import { ProgressiveSteering } from './steering';
 import { drivingInput, vehicleTelemetry, type VehicleTelemetry } from './telemetry';
 
@@ -18,6 +21,9 @@ export class RaceEngine {
   private camera = new THREE.OrthographicCamera(-60,60,42,-42,.1,300);
   private renderer: THREE.WebGLRenderer;
   private car = new THREE.Group();
+  private fleet?: GhostFleet;
+  private raysVisible = true;
+  private checkpointTextures: THREE.Texture[] = [];
   private points: THREE.Vector3[];
   private bounds: ReturnType<typeof trackBounds>;
   private roadScale: number;
@@ -81,6 +87,22 @@ export class RaceEngine {
     const start=this.points[0],t=this.points[1].clone().sub(start).normalize();
     const line=new THREE.Group();line.position.set(start.x,.1,start.z);line.rotation.y=-Math.atan2(t.z,t.x);this.scene.add(line);
     for(let row=0;row<2;row++)for(let col=0;col<10;col++)this.box(.65,.02,this.roadScale,(row+col)%2?'#252d30':'#fff9e9',(row-.5)*.65,0,(col-4.5)*this.roadScale,line);
+    const cumulative = [0];
+    for (let i=0;i<this.points.length;i++) cumulative.push(cumulative[i]+this.points[i].distanceTo(this.points[(i+1)%this.points.length]));
+    const count = CHECKPOINT_COUNTS[this.track];
+    for (let gate=1;gate<=count;gate++) {
+      const arc=cumulative[cumulative.length-1]*gate/(count+1);
+      const i=Math.max(0,cumulative.findIndex(v=>v>arc)-1), a=this.points[i], b=this.points[(i+1)%this.points.length];
+      const p=a.clone().lerp(b,(arc-cumulative[i])/(cumulative[i+1]-cumulative[i]));
+      const heading=Math.atan2(b.z-a.z,b.x-a.x), group=new THREE.Group();
+      group.position.set(p.x,.11,p.z);group.rotation.y=-heading;this.scene.add(group);
+      for(let stripe=0;stripe<10;stripe++) this.box(.45,.025,this.roadScale*.55,'#84dcff',0,0,(stripe-4.5)*this.roadScale,group);
+      const canvas=document.createElement('canvas');canvas.width=128;canvas.height=64;
+      const ctx=canvas.getContext('2d')!;ctx.fillStyle='#182d2a';ctx.fillRect(0,0,128,64);ctx.fillStyle='#a4e9ff';ctx.font='bold 48px monospace';ctx.textAlign='center';ctx.fillText(`CP ${gate}`,64,49);
+      const texture=new THREE.CanvasTexture(canvas);this.checkpointTextures.push(texture);
+      const label=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false}));label.scale.set(this.track===0?7:8,this.track===0?3.5:4,1);
+      label.position.set(p.x-Math.sin(heading)*7*this.roadScale,.3,p.z+Math.cos(heading)*7*this.roadScale);this.scene.add(label);
+    }
     // Direction arrows are painted on the road.
     for(const idx of [35,180,330,470]) {const p=this.points[idx],n=this.points[(idx+1)%600].clone().sub(p).normalize();const arrow=new THREE.Group();arrow.position.set(p.x,.12,p.z);arrow.rotation.y=-Math.atan2(n.z,n.x);this.scene.add(arrow);for(const side of [-1,1]){const m=this.box(1.1,.02,.16,'#adb4a8',0,0,side*.35,arrow);m.rotation.y=side*.65;}}
     let seed=31+this.track*117;const random=()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646;};
@@ -112,14 +134,15 @@ export class RaceEngine {
   }
   private resize() {const w=this.host.clientWidth,h=this.host.clientHeight;if(!w||!h)return;this.renderer.setSize(w,h);const aspect=w/h,b=trackBounds(this.points,18),halfHeight=Math.max((b.maxZ-b.minZ)/2,(b.maxX-b.minX)/(2*aspect));this.camera.position.set((b.minX+b.maxX)/2,100,(b.minZ+b.maxZ)/2);this.camera.left=-halfHeight*aspect;this.camera.right=halfHeight*aspect;this.camera.top=halfHeight;this.camera.bottom=-halfHeight;this.camera.updateProjectionMatrix();}
   private emit(){this.stats.vehicle=this.external && this.agentFrame ? { ...this.agentFrame.controls, steering: this.agentFrame.steering, steeringWheelAngle: this.agentFrame.steering * 90, position: {x:this.agentFrame.x,z:this.agentFrame.z}, headingDegrees: ((this.agentFrame.heading*180/Math.PI)%360+360)%360 } : vehicleTelemetry(this.car.position,this.heading,this.keys,this.stats.status==='racing',this.steering.value);this.onStats({...this.stats});}
-  setExternal=(enabled:boolean)=>{this.external=enabled;this.agentFrame=null;this.reset();};
-  showAgent=(frame:AgentFrame)=>{if(!this.external)return;this.agentFrame=frame;this.car.position.set(frame.x,0,frame.z);this.heading=frame.heading;this.car.rotation.y=-frame.heading;this.stats.speed=frame.speed;this.stats.time=frame.time;this.stats.lap=frame.completed?1:0;this.stats.offroad=frame.offroad;this.stats.status='racing';this.updateSensors();this.emit();};
+  setExternal=(enabled:boolean)=>{this.external=enabled;this.agentFrame=null;this.reset();this.car.visible=!enabled;this.sensorOverlay.group.visible=!enabled&&this.raysVisible;};
+  showFleet=(frame:FleetFrame|null)=>{if(!this.external)return;this.car.visible=false;this.sensorOverlay.group.visible=false;if(frame&&!this.fleet)this.fleet=new GhostFleet(this.car,this.scene);this.fleet?.show(frame);};
+  showAgent=(frame:AgentFrame)=>{if(!this.external)return;this.car.visible=true;this.fleet?.show(null);this.sensorOverlay.group.visible=this.raysVisible;this.agentFrame=frame;this.car.position.set(frame.x,0,frame.z);this.heading=frame.heading;this.car.rotation.y=-frame.heading;this.stats.speed=frame.speed;this.stats.time=frame.time;this.stats.lap=frame.completedLaps;this.stats.offroad=frame.offroad;this.stats.status='racing';this.updateSensors();this.emit();};
   reset=()=>{this.stats={status:'ready',speed:0,lap:0,time:0,best:0,countdown:3,offroad:false,rays:[],vehicle:vehicleTelemetry()};this.progress={previous:0,distance:0,laps:0};this.lapStart=0;this.keys.clear();this.placeAt(0);this.emit();};
   start=()=>{if(this.external)return;this.reset();this.stats.status='countdown';this.countdownTime=3;this.emit();};
   togglePause=()=>{if(this.external)return;if(this.stats.status==='racing')this.stats.status='paused';else if(this.stats.status==='paused')this.stats.status='racing';this.keys.clear();this.steering.reset();this.emit();};
   setKey=(key:string,pressed:boolean)=>{if(this.external)return;if(pressed)this.keys.add(key);else this.keys.delete(key);};
-  setRaysVisible=(visible:boolean)=>{this.sensorOverlay.group.visible=visible;};
-  private updateSensors(){this.stats.rays=senseTrack(this.car.position,this.heading,this.edges);this.sensorOverlay.update(this.stats.rays);}
+  setRaysVisible=(visible:boolean)=>{this.raysVisible=visible;this.sensorOverlay.group.visible=visible&&this.car.visible;};
+  private updateSensors(){if(this.external&&!this.car.visible)return;this.stats.rays=senseTrack(this.car.position,this.heading,this.edges);this.sensorOverlay.update(this.stats.rays);}
   private placeAt(index:number){const p=this.points[index],n=this.points[(index+1)%600];this.car.position.set(p.x,0,p.z);this.heading=Math.atan2(n.z-p.z,n.x-p.x);this.car.rotation.y=-this.heading;this.stats.speed=0;this.steering.reset();this.updateSensors();}
   private keyDown=(e:KeyboardEvent)=>{if(this.external)return;if((e.target as HTMLElement)?.matches('input,textarea,select'))return;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Escape','r','R'].includes(e.key)){e.preventDefault();if(e.key==='Escape'&&!e.repeat)this.togglePause();else if(e.key.toLowerCase()==='r'&&!e.repeat&&this.stats.status==='racing')this.placeAt(this.progress.previous);else this.setKey(e.key,true);}};
   private keyUp=(e:KeyboardEvent)=>{this.setKey(e.key,false);};
@@ -140,5 +163,5 @@ export class RaceEngine {
     }
     this.updateSensors();this.renderer.render(this.scene,this.camera);this.hudTime+=dt;if(this.hudTime>.065){this.emit();this.hudTime=0;}this.frame=requestAnimationFrame(this.tick);
   };
-  dispose(){this.unregisterTools();cancelAnimationFrame(this.frame);this.sensorOverlay.dispose();this.resizeObserver.disconnect();window.removeEventListener('keydown',this.keyDown);window.removeEventListener('keyup',this.keyUp);window.removeEventListener('blur',this.blur);document.removeEventListener('visibilitychange',this.visibility);this.scene.traverse(obj=>{if(obj instanceof THREE.Mesh){obj.geometry.dispose();const materials=Array.isArray(obj.material)?obj.material:[obj.material];materials.forEach(m=>m.dispose());}});this.renderer.dispose();this.renderer.domElement.remove();}
+  dispose(){this.checkpointTextures.forEach(texture=>texture.dispose());this.scene.traverse(obj=>{if(obj instanceof THREE.Sprite)obj.material.dispose();});this.fleet?.dispose();this.unregisterTools();cancelAnimationFrame(this.frame);this.sensorOverlay.dispose();this.resizeObserver.disconnect();window.removeEventListener('keydown',this.keyDown);window.removeEventListener('keyup',this.keyUp);window.removeEventListener('blur',this.blur);document.removeEventListener('visibilitychange',this.visibility);this.scene.traverse(obj=>{if(obj instanceof THREE.Mesh){obj.geometry.dispose();const materials=Array.isArray(obj.material)?obj.material:[obj.material];materials.forEach(m=>m.dispose());}});this.renderer.dispose();this.renderer.domElement.remove();}
 }

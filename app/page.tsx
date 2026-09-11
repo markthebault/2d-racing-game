@@ -8,6 +8,7 @@ import { RaceEngine, type RaceStats } from '@/lib/engine';
 import { SensorDebug } from '@/components/sensor-debug';
 import { TrainingLab } from '@/components/training-lab';
 import { vehicleTelemetry } from '@/lib/telemetry';
+import type { FleetFrame } from '@/lib/rl/batch';
 
 const TRACK_PREVIEWS = TRACKS.map((_, index) => {
   const points = trackCurve(index).getPoints(240);
@@ -22,6 +23,9 @@ export default function Home() {
   const host = useRef<HTMLDivElement>(null);
   const engine = useRef<RaceEngine | null>(null);
   const [learning, setLearning] = useState(false);
+  const [fleet, setFleet] = useState<FleetFrame | null>(null);
+  const [singlePlayback, setSinglePlayback] = useState(false);
+  const fleetUiTime = useRef(0);
   const [track, setTrack] = useState(0);
   const [laps, setLaps] = useState(3);
   const [error,setError] = useState('');
@@ -50,24 +54,25 @@ export default function Home() {
         </Button>)}</div>
         <p className="track-description">{TRACKS[track].description}</p>
         <div className="section-label"><label htmlFor="lap-count">02 / RACE DISTANCE</label></div>
-        <div className="lap-picker"><Button variant="ghost" size="icon" aria-label="Fewer laps" disabled={learning||running||laps===1} onClick={()=>setLaps(laps-1)}><ChevronLeft/></Button><div><input id="lap-count" aria-label="Number of laps" type="number" min="1" max="10" value={laps} disabled={learning||running} onChange={e=>setLaps(Math.min(10,Math.max(1,Number(e.target.value)||1)))}/><span>{laps===1?'lap':'laps'}</span></div><Button variant="ghost" size="icon" aria-label="More laps" disabled={learning||running||laps===10} onClick={()=>setLaps(laps+1)}><ChevronRight/></Button></div>
+        <div className="lap-picker"><Button variant="ghost" size="icon" aria-label="Fewer laps" disabled={(!learning&&running)||laps===1} onClick={()=>setLaps(laps-1)}><ChevronLeft/></Button><div><input id="lap-count" aria-label="Number of laps" type="number" min="1" max="10" value={laps} disabled={!learning&&running} onChange={e=>setLaps(Math.min(10,Math.max(1,Math.floor(Number(e.target.value)||1))))}/><span>{laps===1?'lap':'laps'}</span></div><Button variant="ghost" size="icon" aria-label="More laps" disabled={(!learning&&running)||laps===10} onClick={()=>setLaps(laps+1)}><ChevronRight/></Button></div>
         <Button className="start-button" disabled={learning||running||!!error} onClick={()=>engine.current?.start()}>{learning?'Use training controls':stats.status==='finished'?'Race again':'Start race'}<ArrowUpRight size={22}/></Button>
         <div className="controls"><div className="section-label"><span><Keyboard size={15}/> DRIVER CONTROLS</span></div><div><span><kbd>↑</kbd> Accelerate</span><span><kbd>↓</kbd> Brake / reverse</span></div><div><span><kbd>←</kbd><kbd>→</kbd> Steer</span><span><kbd>Esc</kbd> Pause</span></div><p><kbd>R</kbd> Return to track</p></div>
       </aside>
       <section className="race-panel" aria-label="Race track">
         <div className="race-heading"><div><span className="eyebrow">CIRCUIT 0{track+1}</span><h2>{TRACKS[track].name}</h2></div><span className="mode-tag">{learning?'AI DRIVING LAB':stats.status==='ready'?'READY TO RACE':stats.status==='finished'?'CHECKERED FLAG':'TIME ATTACK'}</span></div>
         <div className="game-view"><div ref={host} className="canvas-host"/>
-          <div className="hud"><div><small>LAP</small><strong>{learning?stats.lap:Math.min(stats.lap+1,laps)}<em> / {learning?1:laps}</em></strong></div><div><small>RACE TIME</small><strong>{formatTime(stats.time)}</strong></div><div><small>BEST LAP</small><strong>{stats.best?formatTime(stats.best):'--:--.--'}</strong></div></div>
+          {(!learning || singlePlayback) && <div className="hud"><div><small>LAP</small><strong>{Math.min(stats.lap+1,laps)}<em> / {laps}</em></strong></div><div><small>RACE TIME</small><strong>{formatTime(stats.time)}</strong></div><div><small>BEST LAP</small><strong>{stats.best?formatTime(stats.best):'--:--.--'}</strong></div></div>}
+          {learning&&!singlePlayback&&<div className="fleet-caption">{fleet&&fleet.track===track ? `EPISODES ${fleet.first}–${fleet.last} · ${fleet.poses.filter(p=>!p.done).length}/50 DRIVING · ${fleet.time.toFixed(1)} s · ${fleet.speed}× REPLAY` : 'LEARNING LAB · Cars appear together after each group of 50 attempts'}</div>}
           {!learning&&stats.status==='ready'&&<div className="ready-label"><span className="live-dot"/> ON THE GRID <small>Choose your laps, then start your engine.</small></div>}
           {!learning&&stats.status==='countdown'&&<div className="countdown" aria-live="assertive">{stats.countdown}</div>}
           {!learning&&stats.status==='paused'&&<div className="game-overlay"><h3>Taking a pit stop.</h3><Button className="start-button" onClick={()=>engine.current?.togglePause()}><Play/> Resume race</Button></div>}
           {!learning&&stats.status==='finished'&&<div className="game-overlay"><Trophy size={36}/><span className="eyebrow">RACE COMPLETE</span><h3>Across the line.</h3><strong className="result-time">{formatTime(stats.time)}</strong><p>{laps} {laps===1?'lap':'laps'} · Best {formatTime(stats.best)}</p><Button className="start-button" onClick={()=>engine.current?.start()}>Race again <RotateCcw/></Button></div>}
           {error&&<div className="game-overlay" role="alert"><h3>Couldn't start the engine.</h3><p>{error}</p></div>}
-          <div className="track-bottom"><span>{stats.offroad?'OFF ROAD · LOW GRIP':'ASPHALT · DRY'}</span><div className="speed"><strong>{Math.round(Math.abs(stats.speed)*5)}</strong><small>KM/H</small></div></div>
+          {(!learning||singlePlayback)&&<div className="track-bottom"><span>{stats.offroad?'OFF ROAD · LOW GRIP':'ASPHALT · DRY'}</span><div className="speed"><strong>{Math.round(Math.abs(stats.speed)*5)}</strong><small>KM/H</small></div></div>}
           <div hidden={learning} className={learning?"ai-hidden":"touch-controls"} aria-label="Touch driving controls">{[['ArrowLeft','←'],['ArrowRight','→'],['ArrowDown','↓'],['ArrowUp','↑']].map(([key,label])=><button key={key} aria-label={key} onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);engine.current?.setKey(key,true);}} onPointerUp={()=>engine.current?.setKey(key,false)} onPointerCancel={()=>engine.current?.setKey(key,false)}>{label}</button>)}</div>
         </div>
         <div className="race-footer"><span><span className="car-dot"/> {learning?'AI / CAR 01':'YOU / CAR 01'} <span className="footer-hint">Follow the track clockwise.</span></span><div><Button variant="ghost" disabled={learning} onClick={()=>engine.current?.reset()} aria-label="Reset race"><RotateCcw size={15}/> Reset</Button><Button variant="ghost" disabled={learning||!running||stats.status==='countdown'} onClick={()=>engine.current?.togglePause()}><Pause size={15}/>{stats.status==='paused'?'Resume':'Pause'}</Button></div></div>
-        {learning&&<TrainingLab key={track} track={track} onFrame={frame=>engine.current?.showAgent(frame)}/>}
+        {learning&&<TrainingLab track={track} laps={laps} onFrame={frame=>{setSinglePlayback(true);engine.current?.showAgent(frame);}} onFleet={frame=>{if(!frame||frame.time===0||performance.now()-fleetUiTime.current>150){setSinglePlayback(false);setFleet(frame);fleetUiTime.current=performance.now();}engine.current?.showFleet(frame);}}/>}
       </section>
     </div>
     <SensorDebug readings={stats.rays} vehicle={stats.vehicle} visible={showRays} onToggle={()=>setShowRays(value=>!value)} open={debugOpen} onOpenChange={setDebugOpen}/>

@@ -1,5 +1,5 @@
-export const OBSERVATION_VERSION = 2;
-export const OBSERVATION_SIZE = 34;
+export const OBSERVATION_VERSION = 3;
+export const OBSERVATION_SIZE = 36;
 export const PRESETS = {
   baseline: { label: '1 · Corrected baseline', speedBonus: true, normalizedProgress: false, absolutePosition: true },
   'no-speed': { label: '2 · Remove speed bonus', speedBonus: false, normalizedProgress: false, absolutePosition: true },
@@ -15,3 +15,6 @@ export function progressRewards(fresh: number, delta: number, speed: number, len
   const config = PRESETS[preset], rate = config.normalizedProgress ? PROGRESS_POINTS_PER_LAP / length : 3;
   return { progress: fresh * rate, reverse: -Math.max(0, -delta) * rate, speed: config.speedBonus ? fresh * Math.max(0, speed) / 40 : 0 };
 }
+
+export const CHECKPOINT_COUNTS = [4, 6, 8] as const;
+export const CHECKPOINT_POINTS_PER_LAP = 1000;
