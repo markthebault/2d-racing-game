@@ -1,3 +1,4 @@
+import { DEFAULT_MIN_DISTANCE } from './motion.ts';
 import { DQNAgent, initializeTensorflow } from './agent.ts';
 import { DrivingEnvironment, DECISION_SECONDS } from './environment.ts';
 import { COMPARISON_SEEDS, DEFAULT_PRESET, OBSERVATION_VERSION, PRESETS, type Preset } from './config.ts';
@@ -26,7 +27,7 @@ let skippedGroups = 0, playbackEpisode: number | null = null;
 let pausedMode: 'idle' | 'train' | 'evaluate' | 'play' | 'batch' = 'idle';
 let runs: RecordedRun[] = [], poses: Pose[] = [], batchTime = 0;
 let pendingTrack: number | null = null;
-let targetLaps = 1;
+let targetLaps = 1, minDistance = DEFAULT_MIN_DISTANCE;
 let pendingLaps: number | null = null;
 function recordPose(): Pose { return { ...environment.state, time: environment.time }; }
 function stopDisplay() {
@@ -41,14 +42,17 @@ function startQueuedBatch() {
 }
 function finishBatch() { stopDisplay(); startQueuedBatch(); }
 
-function switchTrack(track: number, laps = targetLaps) {
+function switchTrack(track: number, laps = targetLaps, threshold = minDistance) {
   if (!Number.isInteger(laps) || laps < 1 || laps > 10) throw new Error("Choose 1–10 laps.");
-  if (track === environment.track && laps === environment.targetLaps) return;
+  if (track === environment.track && laps === environment.targetLaps && threshold === environment.minDistance) return;
+  if (!Number.isFinite(threshold) || threshold < 0 || threshold > 5) throw new Error("Invalid minimum distance.");
+  if (threshold !== minDistance) { agent.clearReplay(); stats.history = []; stats.mean = null; stats.completion = null; completedEpisodes = 0; measuredEpisodes = 0; }
+  minDistance = threshold;
   targetLaps = laps;
   if (stats.comparison && !stats.comparison.complete) { stats.comparison.complete = true; send({ type: 'report', report: stats.comparison }); comparisonJobs = []; }
   const resume = !paused && (mode === 'train' || (mode === 'evaluate' && evaluationResume === 'train'));
   paused = false;
-  environment = new DrivingEnvironment(track, stats.preset, false, targetLaps); observation = environment.reset();
+  environment = new DrivingEnvironment(track, stats.preset, false, targetLaps, minDistance); observation = environment.reset();
   playback = null; evaluation = null; pausedMode = 'idle'; paused = false; clearBatch();
   parentId = best?.id ?? parentId; modelId = id();
   best = { version: MODEL_VERSION, observationVersion: OBSERVATION_VERSION, id: modelId, parentId, track, preset: stats.preset, seed: stats.seed,
@@ -58,13 +62,14 @@ function switchTrack(track: number, laps = targetLaps) {
 }
 let speed = 4, replaySpeed = 1, lastPublish = 0;
 let observation: number[];
-let initialized = false, booting = false, discard = false, completedEpisodes = 0;
+let initialized = false, booting = false, discard = false, completedEpisodes = 0, measuredEpisodes = 0;
 let comparisonJobs: { preset: Preset; seed: number }[] = [];
 function publish() {
   if (!initialized) return;
   stats.steps = agent.steps; stats.updates = agent.updates; stats.epsilon = agent.epsilon;
   stats.loss = agent.loss; stats.replaySize = agent.replay.length;
   stats.track = environment.track; stats.batchCount = runs.length; stats.trainedTracks = [...trainedTracks]; stats.pausedActivity = pausedMode;
+  stats.minDistance = minDistance;
   stats.currentScore = environment.score;
   stats.targetLaps = targetLaps; stats.completedLaps = environment.completedLaps; stats.checkpoints = environment.frame().checkpoints; stats.checkpointCount = environment.checkpointCount;
   stats.backgroundLearning = !paused && (mode === 'train' || (mode === 'evaluate' && evaluationResume === 'train'));
@@ -80,14 +85,14 @@ function publish() {
 function show() { if (display === 'play') send({ type: 'frame', track: environment.track, frame: playback!.frame() }); }
 function summaryOfBest() { if (best) { const { weights: _weights, ...summary } = best; stats.best = summary; } else stats.best = null; }
 function beginEvaluation(useBest: boolean, resume: 'train' | 'idle') {
-  evaluation = new EvaluationSuite(environment.track, stats.preset, targetLaps); evaluateBest = useBest; evaluationResume = resume;
+  evaluation = new EvaluationSuite(environment.track, stats.preset, targetLaps, minDistance); evaluateBest = useBest; evaluationResume = resume;
   mode = 'evaluate'; stats.status = 'evaluating'; stats.message = 'Five varied starts, with exploration and learning disabled.'; publish();
 }
 function setupRun(track: number, preset: Preset, seed: number) {
   agent?.dispose(); bestAgent?.dispose();
   agent = new DQNAgent(seed); bestAgent = new DQNAgent(seed);
-  environment = new DrivingEnvironment(track, preset, false, targetLaps); observation = environment.reset();
-  best = null; evaluation = null; playback = null; parentId = null; trainedTracks = []; modelId = id(); completedEpisodes = 0;
+  environment = new DrivingEnvironment(track, preset, false, targetLaps, minDistance); observation = environment.reset();
+  best = null; evaluation = null; playback = null; parentId = null; trainedTracks = []; modelId = id(); completedEpisodes = 0; measuredEpisodes = 0;
   Object.assign(stats, { episode: 0, preset, seed, best: null, evaluation: null, history: [], milestones: [], mean: null, completion: null, evaluationCase: '' });
   pausedMode = 'idle'; paused = false; clearBatch();
 }
@@ -130,11 +135,11 @@ function trainStep() {
   agent.remember({ state: observation, action, reward: result.reward, next: result.observation, done: result.done });
   observation = result.observation; agent.train();
   if (!result.done) return;
-  stats.episode++; completedEpisodes += Number(environment.completed);
+  stats.episode++; measuredEpisodes++; completedEpisodes += Number(environment.completed);
   const recent = [...stats.history.slice(-19).map(e => e.score), environment.score];
   const metric = { episode: stats.episode, score: environment.score, mean: recent.reduce((a, b) => a + b, 0) / recent.length,
     loss: agent.loss, progress: environment.frame().progress, completed: environment.completed };
-  stats.history = [...stats.history, metric].slice(-300); stats.mean = metric.mean; stats.completion = completedEpisodes / stats.episode;
+  stats.history = [...stats.history, metric].slice(-300); stats.mean = metric.mean; stats.completion = completedEpisodes / measuredEpisodes;
   runs.push({ episode: stats.episode, poses, completed: environment.completed });
   stats.message = `Attempt ${stats.episode}: ${environment.reason.toLowerCase()}. Collecting ${runs.length}/50 recordings.`; observation = environment.reset(); poses = [recordPose()];
   if (runs.length === 50) {
@@ -201,6 +206,7 @@ self.onmessage = async (event: MessageEvent<WorkerCommand>) => {
       void loop().catch(error => { mode = 'idle'; paused = true; send({ type: 'error', message: String(error) }); });
     } else if (command.type === 'speed') speed = [0, 1, 4, 20].includes(command.speed) ? command.speed : 4;
     else if (command.type === 'replay-speed') replaySpeed = [1, 2, 4, 8].includes(command.speed) ? command.speed : 1;
+    else if (initialized && command.type === 'motion') switchTrack(environment.track, targetLaps, command.minDistance);
     else if (command.type === 'track') { if (![0, 1, 2].includes(command.track)) return; if (!initialized) { pendingTrack = command.track; pendingLaps = command.laps ?? null; } else switchTrack(command.track, command.laps ?? targetLaps); }
     else if (initialized && command.type === 'skip-replay' && display === 'batch') { finishBatch(); publish(); }
     else if (initialized && command.type === 'pause') {
@@ -214,7 +220,7 @@ self.onmessage = async (event: MessageEvent<WorkerCommand>) => {
     } else if (initialized && command.type === 'play' && best) {
       stopDisplay(); paused = false; pausedMode = 'idle';
       stats.lastPlayback = null; playbackAgent = new DQNAgent(stats.seed); playbackAgent.loadWeights(best.weights); playbackEpisode = best.episode;
-      playback = new DrivingEnvironment(environment.track, stats.preset, true, targetLaps); display = 'play'; nextPlayback = performance.now() + 100;
+      playback = new DrivingEnvironment(environment.track, stats.preset, true, targetLaps, minDistance); display = 'play'; nextPlayback = performance.now() + 100;
       mode = evaluation ? 'evaluate' : 'train'; if (evaluation) evaluationResume = 'train';
       stats.message = 'Playing a fixed best-model snapshot. The learner trains independently in the background.'; show(); publish();
     } else if (initialized && command.type === 'evaluate' && best) {

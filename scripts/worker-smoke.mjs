@@ -102,7 +102,7 @@ try {
   await idle.wait(()=>idle.latest?.status==='ready');
   idle.worker.postMessage({type:'speed',speed:0});idle.worker.postMessage({type:'play'});
   await idle.wait(()=>idle.latest.lastPlayback!==null);
-  assert.equal(idle.latest.lastPlayback.reason,'No forward progress');assert.equal(idle.latest.backgroundLearning,true);
+  assert.equal(idle.latest.lastPlayback.reason,'Stuck: insufficient movement over 1 second');assert.equal(idle.latest.backgroundLearning,true);
   const steps=idle.latest.steps;await idle.wait(()=>idle.latest.steps>steps);
 }finally{await idle.worker.terminate();}
 const comparison=launch();

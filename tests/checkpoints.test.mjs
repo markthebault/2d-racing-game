@@ -29,7 +29,8 @@ test('three-lap races award each checkpoint once per lap on all circuits',()=>{
   }
 });
 test('reversing and recrossing a rewarded checkpoint cannot farm points',()=>{
-  const env=new DrivingEnvironment(0,'local',false,3),gate=env.length/5;
+  // Isolate checkpoint accounting with the independent movement rule disabled.
+  const env=new DrivingEnvironment(0,'local',false,3,0),gate=env.length/5;
   let total=0;
   for(let arc=0;arc<gate+3;arc+=.75){driveAt(env,arc);total+=env.reward.checkpoint;}
   assert.equal(total,250);

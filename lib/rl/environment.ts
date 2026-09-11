@@ -1,3 +1,4 @@
+import { MotionWindow, DEFAULT_MIN_DISTANCE } from './motion.ts';
 import { sampleTrack, trackEdges, trackBounds, TRACKS, ROAD_EDGE_OFFSET, ROAD_WIDTH } from '../race.ts';
 import { senseTrack } from '../sensors.ts';
 import { ProgressiveSteering } from '../steering.ts';
@@ -13,10 +14,12 @@ export const ACTION_NAMES = ACTIONS.map(a => `${a.accelerator ? 'Accelerate' : a
 const clamp = (n: number, low = -1, high = 1) => Math.min(high, Math.max(low, n));
 const angle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 export type RewardParts = { checkpoint: number; progress: number; speed: number; offroad: number; reverse: number; time: number; finish: number; failure: number };
-export type AgentFrame = VehicleState & { completedLaps: number; targetLaps: number; checkpoints: number; checkpointCount: number; steering: number; controls: Controls; time: number; score: number; progress: number; offroad: boolean; done: boolean; completed: boolean; reason: string; reward: RewardParts; action: number };
+export type AgentFrame = VehicleState & { motionDistance: number | null; minDistance: number; completedLaps: number; targetLaps: number; checkpoints: number; checkpointCount: number; steering: number; controls: Controls; time: number; score: number; progress: number; offroad: boolean; done: boolean; completed: boolean; reason: string; reward: RewardParts; action: number };
 
 /** Closest segment projection gives smooth arc-length progress, rather than sample-index jumps. */
 export class DrivingEnvironment {
+  readonly motion = new MotionWindow();
+  readonly minDistance: number;
   readonly track: number;
   readonly preset: Preset;
   readonly targetLaps: number;
@@ -49,7 +52,9 @@ export class DrivingEnvironment {
   private nextGate = 0;
   private gates = 0;
   private playbackMode: boolean;
-  constructor(track: number, preset: Preset = DEFAULT_PRESET, playbackMode = false, targetLaps = 1) {
+  constructor(track: number, preset: Preset = DEFAULT_PRESET, playbackMode = false, targetLaps = 1, minDistance = DEFAULT_MIN_DISTANCE) {
+    if (!Number.isFinite(minDistance) || minDistance < 0 || minDistance > 5) throw new Error("Minimum distance must be between 0 and 5 units.");
+    this.minDistance = minDistance;
     if (!Number.isInteger(targetLaps) || targetLaps < 1 || targetLaps > 10) throw new Error("Choose 1–10 laps.");
     this.targetLaps = targetLaps; this.checkpointCount = CHECKPOINT_COUNTS[track];
     this.playbackMode = playbackMode;
@@ -85,6 +90,7 @@ export class DrivingEnvironment {
     const p = this.points[index], n = this.points[(index + 1) % this.points.length];
     const t = (this.startArc - this.cumulative[index]) / this.lengths[index], heading = Math.atan2(n.z-p.z,n.x-p.x);
     this.state = { x: p.x + (n.x-p.x)*t - Math.sin(heading)*start.offset, z: p.z + (n.z-p.z)*t + Math.cos(heading)*start.offset, heading: heading + start.heading, speed: 0 };
+    this.motion.reset(this.state);
     this.steering.reset(); this.controls = { accelerator: 0, brake: 0, steering: 0 };
     this.time = this.score = this.distance = this.furthest = this.offroadTime = this.stalledTime = 0;
     this.previousArc = this.project().arc; this.totalOffroadTime = 0; this.nextGate = this.length / (this.checkpointCount + 1); this.gates = 0; this.completedLaps = 0;
@@ -157,9 +163,11 @@ export class DrivingEnvironment {
       else this.offroadTime = 0;
       this.time += 1 / 60; reward.time -= 1 / 60;
       this.stalledTime = valid && delta > .015 ? 0 : this.stalledTime + 1 / 60;
-      if (!this.done && (this.offroadTime >= (this.playbackMode ? 5 : 1) || (!this.playbackMode && after.distance > this.halfWidth + 3) || (this.stalledTime >= 6 && !(this.playbackMode && this.offroadTime > 0)) || this.time >= 90 * this.targetLaps)) {
+      const motionDistance = this.motion.step(this.state);
+      const stuck = motionDistance !== null && motionDistance < this.minDistance;
+      if (!this.done && (stuck || this.offroadTime >= (this.playbackMode ? 5 : 1) || (!this.playbackMode && after.distance > this.halfWidth + 3) || (this.stalledTime >= 6 && !(this.playbackMode && this.offroadTime > 0)) || this.time >= 90 * this.targetLaps)) {
         this.done = true; reward.failure = -100;
-        this.reason = this.time >= 90 * this.targetLaps ? 'Time limit' : this.offroadTime >= (this.playbackMode ? 5 : 1) || after.distance > this.halfWidth + 3 ? 'Left the track' : 'No forward progress';
+        this.reason = stuck ? 'Stuck: insufficient movement over 1 second' : this.time >= 90 * this.targetLaps ? 'Time limit' : this.offroadTime >= (this.playbackMode ? 5 : 1) || after.distance > this.halfWidth + 3 ? 'Left the track' : 'No forward progress';
       }
       if (this.done) break;
     }
@@ -169,7 +177,7 @@ export class DrivingEnvironment {
     return { observation: this.observe(), reward: total, done: this.done };
   }
   frame(): AgentFrame {
-    return { ...this.state, steering: this.steering.value, controls: { ...this.controls }, time: this.time, score: this.score,
+    return { ...this.state, motionDistance: this.motion.distance, minDistance: this.minDistance, steering: this.steering.value, controls: { ...this.controls }, time: this.time, score: this.score,
       completedLaps: this.completedLaps, targetLaps: this.targetLaps, checkpoints: this.gates, checkpointCount: this.checkpointCount,
       progress: clamp(this.furthest / (this.length * this.targetLaps), 0, 1), offroad: this.project().distance > this.halfWidth,
       done: this.done, completed: this.completed, reason: this.reason, reward: { ...this.reward }, action: this.action };

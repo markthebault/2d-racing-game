@@ -28,6 +28,7 @@ export class DQNAgent {
     this.random = seededRandom(seed); this.online = network(seed); this.target = network(seed + 10);
     this.target.setWeights(this.online.getWeights());
   }
+  clearReplay() { this.replay = []; this.cursor = 0; }
   get epsilon() { return Math.max(.04, Math.exp(-this.steps / 16000)); }
   act(state: number[], explore = false) {
     if (explore && this.random() < this.epsilon) {

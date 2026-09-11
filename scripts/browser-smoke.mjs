@@ -27,7 +27,7 @@ try {
   await wait(()=>window.__rlStats?.status==='ready');
   const layout=await page.evaluate(()=>({track:document.querySelector('.track-option').getBoundingClientRect().right,canvas:document.querySelector('.race-panel').getBoundingClientRect().left}));
   assert.ok(layout.track<layout.canvas,'Circuit buttons fit beside the canvas');
-  await page.locator('.training-actions select').selectOption('0');
+  await page.locator('.training-actions select').first().selectOption('0');
   await page.getByRole('button',{name:'Start training',exact:true}).click();
   await wait(()=>window.__rlStats?.episode>=10);
   console.log('Browser: first 10 episodes trained without individual car frames.');

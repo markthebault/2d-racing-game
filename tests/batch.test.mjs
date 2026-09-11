@@ -14,8 +14,9 @@ test('fifty recorded cars interpolate together, stop individually and retain ter
   const end=sampleBatch(runs,10,2);assert.ok(end.poses.every(p=>p.done));assert.equal(end.poses[49].x,50);
   assert.equal(end.poses[0].completed,true);assert.equal(end.duration,.1);
 });
+// Disable the independent motion rule here to isolate the off-road recovery timer.
 test('playback allows five continuous seconds even far off-road and after earlier stalled time', () => {
-  const env=new DrivingEnvironment(0,'local',true);
+  const env=new DrivingEnvironment(0,'local',true,1,0);
   env.state.x=0;env.state.z=0;env.stalledTime=5.5;
   for(let i=0;i<49;i++){env.step(4);assert.equal(env.done,false);}
   while(!env.done)env.step(4);
@@ -25,7 +26,7 @@ test('playback allows five continuous seconds even far off-road and after earlie
   assert.equal(training.done,true,'training retains its distance limit');
 });
 test('returning to the track resets the playback grace period', () => {
-  const env=new DrivingEnvironment(0,'local',true),start={...env.state};
+  const env=new DrivingEnvironment(0,'local',true,1,0),start={...env.state};
   env.state.x=0;env.state.z=0;for(let i=0;i<30;i++)env.step(4);
   env.state={...start};env.step(4);assert.equal(env.offroadTime,0);assert.equal(env.done,false);
   env.state.x=0;env.state.z=0;for(let i=0;i<30;i++)env.step(4);

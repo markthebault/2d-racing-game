@@ -10,6 +10,7 @@ export type ComparisonRow = { preset: Preset; seed: number; episodes: number; st
 export type ComparisonReport = { targetLaps?: number; id: string; track: number; budget: number; rows: ComparisonRow[]; complete: boolean };
 export type TrainingStatus = 'loading' | 'ready' | 'training' | 'evaluating' | 'paused' | 'playing' | 'replaying' | 'playback-ended' | 'error';
 export type TrainingStats = {
+  minDistance: number;
   lastPlayback: { episode: number; score: number; reason: string; completedLaps: number; targetLaps: number } | null;
   backgroundLearning: boolean; queuedGroups: number; skippedGroups: number; playbackEpisode: number | null;
   targetLaps: number; completedLaps: number; checkpoints: number; checkpointCount: number; track: number; batchCount: number; trainedTracks: number[]; pausedActivity: string; currentScore: number;
@@ -22,11 +23,12 @@ export type WorkerCommand = { type: 'init'; laps?: number; track: number; checkp
   | { type: 'train' | 'resume' | 'pause' | 'play' | 'reset' | 'evaluate' }
   | { type: 'compare'; episodes: number }
   | { type: 'track'; track: number; laps?: number }
+  | { type: 'motion'; minDistance: number }
   | { type: 'skip-replay' }
   | { type: 'replay-speed'; speed: number }
   | { type: 'speed'; speed: number };
 export type WorkerMessage = { type: 'stats'; stats: TrainingStats } | { type: 'frame'; frame: AgentFrame; track: number }
   | { type: 'fleet'; frame: FleetFrame | null }
   | { type: 'checkpoint'; checkpoint: Checkpoint } | { type: 'report'; report: ComparisonReport } | { type: 'error'; message: string };
-export const emptyTrainingStats = (): TrainingStats => ({ lastPlayback: null, backgroundLearning: false, queuedGroups: 0, skippedGroups: 0, playbackEpisode: null, targetLaps: 1, completedLaps: 0, checkpoints: 0, checkpointCount: 4, track: 0, batchCount: 0, trainedTracks: [], pausedActivity: '', currentScore: 0, status: 'loading', episode: 0, steps: 0, updates: 0, epsilon: 1, loss: null, mean: null, completion: null, best: null,
+export const emptyTrainingStats = (): TrainingStats => ({ minDistance: 1, lastPlayback: null, backgroundLearning: false, queuedGroups: 0, skippedGroups: 0, playbackEpisode: null, targetLaps: 1, completedLaps: 0, checkpoints: 0, checkpointCount: 4, track: 0, batchCount: 0, trainedTracks: [], pausedActivity: '', currentScore: 0, status: 'loading', episode: 0, steps: 0, updates: 0, epsilon: 1, loss: null, mean: null, completion: null, best: null,
   evaluation: null, history: [], milestones: [], replaySize: 0, message: 'Preparing the learning engine…', preset: 'local', seed: 42, evaluationCase: '', comparison: null, comparisonRun: 0 });

@@ -111,11 +111,11 @@ The last two observation inputs encode completed-lap fraction and requested lap 
 | Time | −1 per simulated second |
 | Failure or timeout | −100 |
 
-Forward progress uses a high-water mark and is capped to the requested race distance. Driving the same segment repeatedly cannot earn repeated progress points. Off-road travel earns no progress. Time penalties use actual physics time, including partial terminal decisions. Episodes end after the requested number of full laps, one continuous second off-road, moving more than three units beyond the road edge, six seconds without forward progress, or 90 simulated seconds per requested lap. Road state is measured at the car center.
+Forward progress uses a high-water mark and is capped to the requested race distance. Driving the same segment repeatedly cannot earn repeated progress points. Off-road travel earns no progress. Time penalties use actual physics time, including partial terminal decisions. Episodes end after the requested number of full laps, one continuous second off-road, moving more than three units beyond the road edge, net movement below the selected minimum over one simulated second, six seconds without forward progress, or 90 simulated seconds per requested lap. Road state is measured at the car center.
 
 Normal training and playback start at the finish line. Evaluation starts elsewhere require a full loop back to that start, not a shorter run to the painted line. Checkpoints are relative to the starting position.
 
-**Run best model** allows five continuous seconds off-road to recover. Its distance-from-road cutoff is disabled, and stalled time cannot shorten that off-road grace period. Returning to the road resets the grace period. The time limit of 90 seconds per requested lap still applies. Training and five-start evaluations retain the stricter one-second and distance limits, so evaluation scores remain comparable.
+**Run best model** allows five continuous seconds off-road to recover. Its distance-from-road cutoff is disabled, and the older forward-progress timer cannot shorten that off-road grace period. The new minimum-movement rule still ends stuck playback after one second. Returning to the road resets the grace period. The time limit of 90 seconds per requested lap still applies. Training and five-start evaluations retain the stricter one-second and distance limits, so evaluation scores remain comparable.
 
 ### Evaluation and best models
 
@@ -158,3 +158,9 @@ node scripts/checkpoints-browser.mjs
 ```
 
 Checks cover reward history, normalization, full laps from varied starts on all circuits, checkpoint exploits, evaluation aggregation, legacy prediction preservation, inference and fine-tuning across tracks, tensor cleanup, five-second playback recovery, fleet interpolation and worker scheduling. The separate Chromium check trains two real groups of 50, exercises replay pause/resume and skipping, checks live learner retention across all three tracks, runs best-model playback, and checks mobile overflow and browser errors. These workflow checks do not establish policy convergence or guarantee successful laps on unseen circuits.
+
+### Stuck-car detection
+
+**Minimum movement / 1 s** defaults to 1 world unit and can be adjusted or disabled. Every physics step compares the car position with its position exactly 60 steps earlier. The first second gathers samples; thereafter the window rolls continuously. Small back-and-forth movements do not accumulate distance. Falling below the threshold ends training, evaluation, or best-model playback with the existing −100 failure penalty. Pausing freezes simulated time. Normal acceleration from rest travels about 8 units in its first second.
+
+Changing the threshold retains weights and optimizer state, but restarts the attempt and evaluation and clears old experience memory and replay recordings. Evaluation results record the threshold and cannot be ranked against a different threshold. Track changes retain the setting; new sessions default to 1 unit. Existing models remain loadable with the same 36 inputs; the rolling position history is not supplied to the network.

@@ -15,7 +15,7 @@ try{
   await wait(()=>window.rlStats?.status==='ready'&&window.rlStats.targetLaps===3);
   assert.equal(await page.evaluate(()=>window.rlStats.checkpointCount),4);
   assert.equal(await page.getByLabel('Number of laps').isDisabled(),false);
-  await page.locator('.training-actions select').selectOption('0');
+  await page.locator('.training-actions select').first().selectOption('0');
   await page.getByRole('button',{name:'Start training',exact:true}).click();
   await wait(()=>window.rlStats?.best?.evaluation);
   await page.locator('.train-button').click();await wait(()=>window.rlStats?.status==='paused');

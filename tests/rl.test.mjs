@@ -30,7 +30,7 @@ test('agent controls use identical physics, speed limits and progressive steerin
 test('stationary episodes cannot earn points; off-road movement cannot earn progress', () => {
   const idle = new DrivingEnvironment(0);
   while (!idle.done) idle.step(4);
-  assert.equal(idle.reason, 'No forward progress'); assert.ok(idle.score < -100); assert.equal(idle.completed, false);
+  assert.equal(idle.reason, 'Stuck: insufficient movement over 1 second'); assert.ok(idle.score < -100); assert.equal(idle.completed, false);
   assert.throws(() => idle.step(1), /Reset/);
   const grass = new DrivingEnvironment(0); grass.state.x = 0; grass.state.z = 0;
   const result = grass.step(1);
