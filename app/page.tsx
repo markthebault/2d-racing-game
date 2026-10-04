@@ -71,11 +71,13 @@ export default function Home() {
             const Icon=view.id==='top'?Map:view.id==='chase'?Camera:Orbit;
             return <Button key={view.id} variant="ghost" aria-pressed={cameraView===view.id} onClick={()=>setCameraView(view.id)}><Icon size={15}/>{view.label}</Button>;
           })}</fieldset>
+          {learning&&(cameraView==='overhead'||(cameraView==='chase'&&!singlePlayback))&&<Button variant="ghost" onClick={()=>engine.current?.resetOverheadCamera()}>Fit track</Button>}
           <Button variant="ghost" className="camera-rays" aria-pressed={showRays} onClick={()=>setShowRays(value=>!value)}>Sensor rays <span className="ray-status"/></Button>
         </div>
         <div className="game-view"><div ref={host} className="canvas-host"/>
           {cameraView==='chase'&&((!learning&&stats.status!=='ready')||(learning&&singlePlayback))&&<div className="chase-map" aria-label="Car position on circuit"><svg viewBox={TRACK_PREVIEWS[track].viewBox} aria-hidden="true"><path d={TRACK_PREVIEWS[track].path} fill="none" stroke="#b8c4b1" strokeWidth="3"/><circle cx={stats.vehicle.position.x} cy={stats.vehicle.position.z} r="3" fill="#ff765b" stroke="#fff1cf" strokeWidth="1"/></svg><span>CIRCUIT MAP</span></div>}
           {cameraView==='chase'&&learning&&!singlePlayback&&<div className="camera-note">Whole-circuit view during fleet replays. Chase follows the best model.</div>}
+          {learning&&cameraView==='overhead'&&<div className="camera-note">Drag to pan · Right-drag to rotate · Wheel to zoom · Arrows to move · Shift + arrows for speed</div>}
           {(!learning || singlePlayback) && <div className="hud"><div><small>LAP</small><strong>{Math.min(stats.lap+1,laps)}<em> / {laps}</em></strong></div><div><small>RACE TIME</small><strong>{formatTime(stats.time)}</strong></div><div><small>BEST LAP</small><strong>{stats.best?formatTime(stats.best):'--:--.--'}</strong></div></div>}
           {learning&&!singlePlayback&&<div className="fleet-caption">{fleet&&fleet.track===track ? `EPISODES ${fleet.first}–${fleet.last} · ${fleet.poses.filter(p=>!p.done).length}/${fleet.poses.length} DRIVING · ${fleet.time.toFixed(1)} s · ${fleet.speed}× REPLAY` : 'LEARNING LAB · Cars appear together after each group of 50 attempts'}</div>}
           {!learning&&stats.status==='ready'&&<div className="ready-label"><span className="live-dot"/> ON THE GRID <small>Choose your laps, then start your engine.</small></div>}

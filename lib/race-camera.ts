@@ -13,6 +13,7 @@ export class RaceCamera {
   readonly top = new THREE.OrthographicCamera(-60, 60, 42, -42, 0.1, 1200);
   readonly chase = new THREE.PerspectiveCamera(48, 1, 0.1, 1200);
   readonly overhead = new THREE.PerspectiveCamera(42, 1, 0.1, 1200);
+  readonly overheadTarget = new THREE.Vector3();
   view: CameraView = 'top';
   effectiveView: CameraView = 'top';
   private bounds: ReturnType<typeof trackBounds>;
@@ -21,6 +22,9 @@ export class RaceCamera {
   private desiredTarget = new THREE.Vector3();
   private previousCar = new THREE.Vector3();
   private snap = true;
+  private overheadMoved = false;
+  private overheadFitPosition = new THREE.Vector3();
+  private overheadFitTarget = new THREE.Vector3();
 
   constructor(points: THREE.Vector3[]) {
     this.bounds = trackBounds(points, 18);
@@ -39,6 +43,21 @@ export class RaceCamera {
 
   resetFollow() {
     this.snap = true;
+  }
+
+  markOverheadMoved() {
+    this.overheadMoved =
+      this.overhead.position.distanceToSquared(this.overheadFitPosition) >
+        1e-8 ||
+      this.overheadTarget.distanceToSquared(this.overheadFitTarget) > 1e-8;
+  }
+
+  resetOverhead() {
+    this.overheadMoved = false;
+    this.overheadTarget.copy(this.overheadFitTarget);
+    this.overhead.position.copy(this.overheadFitPosition);
+    this.overhead.lookAt(this.overheadTarget);
+    this.overhead.updateMatrixWorld();
   }
 
   resize(width: number, height: number) {
@@ -86,11 +105,13 @@ export class RaceCamera {
             corner.dot(direction) + Math.abs(corner.dot(up)) / tangent,
           );
         }
-    this.overhead.position
+    this.overheadFitTarget.copy(center);
+    this.overheadFitPosition
       .copy(center)
       .addScaledVector(direction, distance * 1.08);
-    this.overhead.lookAt(center);
-    this.overhead.updateMatrixWorld();
+    // Keep a user's pan, orbit and zoom through layout changes. Fit track uses
+    // the freshly calculated framing for the current viewport.
+    if (!this.overheadMoved) this.resetOverhead();
     this.top.updateMatrixWorld();
   }
 

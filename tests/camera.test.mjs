@@ -82,6 +82,48 @@ test('camera selection and updates leave vehicle coordinates unchanged', () => {
   }
 });
 
+test('custom overhead position survives resizing, replays and switching cameras', () => {
+  const points = sampleTrack(1),
+    cameras = new RaceCamera(points);
+  cameras.resize(1200, 590);
+  cameras.setView('overhead');
+  cameras.update(points[0], 0, 0.1);
+  cameras.overhead.position.add(new THREE.Vector3(12, -8, -4));
+  cameras.overheadTarget.add(new THREE.Vector3(12, 0, -4));
+  cameras.overhead.lookAt(cameras.overheadTarget);
+  cameras.markOverheadMoved();
+  const position = cameras.overhead.position.clone(),
+    target = cameras.overheadTarget.clone();
+  cameras.resize(390, 440);
+  for (const view of ['top', 'chase', 'overhead']) {
+    cameras.setView(view);
+    cameras.update(points[100], 1.2, 0.1, false);
+    assert.deepEqual(cameras.overhead.position, position);
+    assert.deepEqual(cameras.overheadTarget, target);
+  }
+  assert.equal(cameras.overhead.aspect, 390 / 440);
+});
+
+test('Fit track discards navigation and restores whole-circuit framing for the current viewport', () => {
+  const points = sampleTrack(4),
+    cameras = new RaceCamera(points);
+  cameras.resize(1200, 590);
+  cameras.overhead.position.multiplyScalar(0.2);
+  cameras.overheadTarget.set(25, 0, 10);
+  cameras.markOverheadMoved();
+  cameras.resize(390, 440);
+  cameras.resetOverhead();
+  const expected = new RaceCamera(points);
+  expected.resize(390, 440);
+  assert.deepEqual(cameras.overhead.position, expected.overhead.position);
+  assert.deepEqual(cameras.overheadTarget, expected.overheadTarget);
+  // OrbitControls can emit a change while synchronizing the restored pose.
+  cameras.markOverheadMoved();
+  cameras.resize(1400, 900);
+  expected.resize(1400, 900);
+  assert.deepEqual(cameras.overhead.position, expected.overhead.position);
+});
+
 test('formula car parts stay flat and cloneable for real fleet instancing', () => {
   const car = new THREE.Group();
   buildRaceCar(car);

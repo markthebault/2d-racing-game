@@ -1,5 +1,6 @@
 import { registerRaceTools } from './webmcp';
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TRACKS, ROAD_WIDTH, ROAD_EDGE_OFFSET, offsetTrackPoint, trackEdges, trackBounds, sampleTrack, nearestPoint, advanceProgress, type Progress } from './race';
 import { senseTrack, type EdgeSegment, type RayReading } from './sensors';
 import { SensorOverlay } from './sensor-overlay';
@@ -21,6 +22,8 @@ export class RaceEngine {
   private unregisterTools: () => void = () => {};
   private scene = new THREE.Scene();
   private cameras: RaceCamera;
+  private overheadControls: OrbitControls;
+  private cameraKeys = new Set<string>();
   private renderer: THREE.WebGLRenderer;
   private car = new THREE.Group();
   private fleet?: GhostFleet;
@@ -67,6 +70,17 @@ export class RaceEngine {
     sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-120;sun.shadow.camera.right=120;sun.shadow.camera.top=100;sun.shadow.camera.bottom=-100;sun.shadow.camera.far=250;sun.shadow.normalBias=.05;this.scene.add(sun);
     this.buildTrack(); this.buildCar(); this.reset();
     this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(host);this.resize();
+    this.overheadControls=new OrbitControls(this.cameras.overhead,this.renderer.domElement);
+    this.overheadControls.target=this.cameras.overheadTarget;
+    this.overheadControls.cursor.copy(this.cameras.overheadTarget);
+    this.overheadControls.screenSpacePanning=false;
+    this.overheadControls.minDistance=12;this.overheadControls.maxDistance=600;
+    this.overheadControls.maxTargetRadius=200;
+    this.overheadControls.minPolarAngle=.08;this.overheadControls.maxPolarAngle=Math.PI/2-.12;
+    this.overheadControls.mouseButtons={LEFT:THREE.MOUSE.PAN,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.ROTATE};
+    this.overheadControls.touches={ONE:THREE.TOUCH.PAN,TWO:THREE.TOUCH.DOLLY_PAN};
+    this.overheadControls.update();this.overheadControls.enabled=false;this.overheadControls.disconnect();
+    this.overheadControls.addEventListener('change',this.cameraChanged);
     window.addEventListener('keydown',this.keyDown);window.addEventListener('keyup',this.keyUp);window.addEventListener('blur',this.blur);document.addEventListener('visibilitychange',this.visibility);
     this.unregisterTools=registerRaceTools(this.start,()=>({...this.stats}));
     this.frame=requestAnimationFrame(this.tick);
@@ -157,12 +171,38 @@ export class RaceEngine {
   togglePause=()=>{if(this.external)return;if(this.stats.status==='racing')this.stats.status='paused';else if(this.stats.status==='paused')this.stats.status='racing';this.keys.clear();this.steering.reset();this.emit();};
   setKey=(key:string,pressed:boolean)=>{if(this.external)return;if(pressed)this.keys.add(key);else this.keys.delete(key);};
   setRaysVisible=(visible:boolean)=>{this.raysVisible=visible;this.sensorOverlay.group.visible=visible&&this.car.visible;this.needsRender=true;};
-  setCameraView=(view:CameraView)=>{this.cameras.setView(view);this.needsRender=true;};
+  setCameraView=(view:CameraView)=>{this.cameraKeys.clear();this.cameras.setView(view);this.needsRender=true;};
+  resetOverheadCamera=()=>{this.cameraKeys.clear();this.cameras.resetOverhead();this.overheadControls.update();this.needsRender=true;};
+  private cameraChanged=()=>{this.cameras.markOverheadMoved();this.cameras.overhead.updateMatrixWorld();this.needsRender=true;};
+  private updateCameraControls(dt:number) {
+    const controls=this.overheadControls,enabled=this.external&&this.cameras.effectiveView==='overhead';
+    if(controls.enabled!==enabled) {
+      controls.enabled=enabled;this.cameraKeys.clear();
+      if(enabled){controls.connect(this.renderer.domElement);controls.cursorStyle='grab';}else controls.disconnect();
+      this.renderer.domElement.classList.toggle('camera-interactive',enabled);
+      this.renderer.domElement.tabIndex=enabled?0:-1;
+    }
+    if(!enabled)return;
+    const x=Number(this.cameraKeys.has('ArrowRight'))-Number(this.cameraKeys.has('ArrowLeft'));
+    const y=Number(this.cameraKeys.has('ArrowUp'))-Number(this.cameraKeys.has('ArrowDown'));
+    if(!x&&!y)return;
+    const pixels=240*dt*(this.cameraKeys.has('Shift')?3:1)/Math.hypot(x,y);
+    controls.pan(-x*pixels,y*pixels);
+  }
   private updateSensors(){if(this.external&&!this.car.visible)return;this.stats.rays=senseTrack(this.car.position,this.heading,this.edges);this.sensorOverlay.update(this.stats.rays);}
   private placeAt(index:number){const p=this.points[index],n=this.points[(index+1)%600];this.car.position.set(p.x,0,p.z);this.heading=Math.atan2(n.z-p.z,n.x-p.x);this.car.rotation.y=-this.heading;this.stats.speed=0;this.steering.reset();this.cameras.resetFollow();this.needsRender=true;this.shadowDirty=true;this.updateSensors();}
-  private keyDown=(e:KeyboardEvent)=>{if(this.external)return;if((e.target as HTMLElement)?.matches('input,textarea,select'))return;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Escape','r','R'].includes(e.key)){e.preventDefault();if(e.key==='Escape'&&!e.repeat)this.togglePause();else if(e.key.toLowerCase()==='r'&&!e.repeat&&this.stats.status==='racing')this.placeAt(this.progress.previous);else this.setKey(e.key,true);}};
-  private keyUp=(e:KeyboardEvent)=>{this.setKey(e.key,false);};
-  private blur=()=>{this.keys.clear();if(this.stats.status==='racing')this.togglePause();};
+  private keyDown=(e:KeyboardEvent)=>{
+    if((e.target as HTMLElement)?.closest('input,textarea,select,[contenteditable="true"],[role="tablist"]')){this.cameraKeys.clear();return;}
+    if(this.external) {
+      if(!this.overheadControls.enabled||e.ctrlKey||e.metaKey||e.altKey)return;
+      if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();this.cameraKeys.add(e.key);if(e.shiftKey)this.cameraKeys.add('Shift');}
+      else if(e.key==='Shift')this.cameraKeys.add('Shift');
+      return;
+    }
+    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Escape','r','R'].includes(e.key)){e.preventDefault();if(e.key==='Escape'&&!e.repeat)this.togglePause();else if(e.key.toLowerCase()==='r'&&!e.repeat&&this.stats.status==='racing')this.placeAt(this.progress.previous);else this.setKey(e.key,true);}
+  };
+  private keyUp=(e:KeyboardEvent)=>{this.cameraKeys.delete(e.key);this.setKey(e.key,false);};
+  private blur=()=>{this.cameraKeys.clear();this.keys.clear();if(this.stats.status==='racing')this.togglePause();};
   private visibility=()=>{if(document.hidden)this.blur();};
   private tick=(now:number)=>{
     const elapsed=Math.max(0,(now-(this.last||now))/1000),dt=Math.min(elapsed,.05);this.last=now;
@@ -181,6 +221,7 @@ export class RaceEngine {
       if(advanceProgress(this.progress,next.index,next.distance<=5.5*this.roadScale&&near.distance<=5.5*this.roadScale,600)) {const lapTime=this.stats.time-this.lapStart;this.lapStart=this.stats.time;this.stats.best=this.stats.best?Math.min(this.stats.best,lapTime):lapTime;this.stats.lap=this.progress.laps;if(this.stats.lap>=this.laps){this.stats.status='finished';this.stats.speed=0;this.keys.clear();this.steering.reset();}}
     }
     this.updateSensors();this.cameraPosition.copy(this.cameras.active.position);this.cameras.update(this.car.position,this.heading,dt,this.car.visible);
+    this.updateCameraControls(Math.min(elapsed,.25));
     if(this.cameraPosition.distanceToSquared(this.cameras.active.position)>1e-8)this.needsRender=true;
     for(const label of this.checkpointLabels)label.visible=this.cameras.effectiveView!=='chase';
     const canvas=this.renderer.domElement;
@@ -192,5 +233,5 @@ export class RaceEngine {
     if(this.needsRender){this.renderer.render(this.scene,this.cameras.active);this.needsRender=false;}
     this.hudTime+=dt;if(this.hudTime>.065){this.emit();this.hudTime=0;}this.frame=requestAnimationFrame(this.tick);
   };
-  dispose(){this.checkpointTextures.forEach(texture=>texture.dispose());this.scene.traverse(obj=>{if(obj instanceof THREE.Sprite)obj.material.dispose();});this.fleet?.dispose();this.unregisterTools();cancelAnimationFrame(this.frame);this.sensorOverlay.dispose();this.resizeObserver.disconnect();window.removeEventListener('keydown',this.keyDown);window.removeEventListener('keyup',this.keyUp);window.removeEventListener('blur',this.blur);document.removeEventListener('visibilitychange',this.visibility);this.scene.traverse(obj=>{if(obj instanceof THREE.Mesh){obj.geometry.dispose();const materials=Array.isArray(obj.material)?obj.material:[obj.material];materials.forEach(m=>m.dispose());}});this.renderer.dispose();this.renderer.domElement.remove();}
+  dispose(){this.overheadControls.removeEventListener('change',this.cameraChanged);this.overheadControls.dispose();this.checkpointTextures.forEach(texture=>texture.dispose());this.scene.traverse(obj=>{if(obj instanceof THREE.Sprite)obj.material.dispose();});this.fleet?.dispose();this.unregisterTools();cancelAnimationFrame(this.frame);this.sensorOverlay.dispose();this.resizeObserver.disconnect();window.removeEventListener('keydown',this.keyDown);window.removeEventListener('keyup',this.keyUp);window.removeEventListener('blur',this.blur);document.removeEventListener('visibilitychange',this.visibility);this.scene.traverse(obj=>{if(obj instanceof THREE.Mesh){obj.geometry.dispose();const materials=Array.isArray(obj.material)?obj.material:[obj.material];materials.forEach(m=>m.dispose());}});this.renderer.dispose();this.renderer.domElement.remove();}
 }
