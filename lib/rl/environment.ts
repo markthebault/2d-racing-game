@@ -1,3 +1,4 @@
+import { BarrierWorld, trackBarriers } from '../barriers.ts';
 import { maskFeatures } from './features.ts';
 import { MotionWindow, DEFAULT_MIN_DISTANCE } from './motion.ts';
 import { sampleTrack, trackEdges, trackBounds, TRACKS, ROAD_EDGE_OFFSET, ROAD_WIDTH } from '../race.ts';
@@ -31,6 +32,7 @@ export class DrivingEnvironment {
   readonly points;
   readonly edges;
   readonly bounds;
+  readonly barriers;
   readonly halfWidth;
   readonly lengths: number[] = [];
   readonly cumulative: number[] = [0];
@@ -65,6 +67,7 @@ export class DrivingEnvironment {
     this.points = sampleTrack(track);
     this.edges = trackEdges(this.points, ROAD_EDGE_OFFSET * TRACKS[track].roadScale);
     this.bounds = trackBounds(this.points);
+    this.barriers = new BarrierWorld(trackBarriers(this.points, TRACKS[track].roadScale).walls);
     this.halfWidth = ROAD_WIDTH * TRACKS[track].roadScale / 2;
     for (let i = 0; i < this.points.length; i++) {
       this.lengths.push(this.points[i].distanceTo(this.points[(i + 1) % this.points.length]));
@@ -167,7 +170,7 @@ export class DrivingEnvironment {
     const context = this.preset === 'adaptive' ? this.roadContext() : null;
     for (let sub = 0; sub < 6; sub++) {
       const before = this.project();
-      stepVehicle(this.state, this.controls, this.steering, 1 / 60, before.distance > this.halfWidth, this.bounds);
+      stepVehicle(this.state, this.controls, this.steering, 1 / 60, before.distance > this.halfWidth, this.bounds, this.barriers);
       const after = this.project(), onRoad = before.distance <= this.halfWidth && after.distance <= this.halfWidth;
       let delta = after.arc - this.previousArc;
       if (delta < -this.length / 2) delta += this.length;

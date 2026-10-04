@@ -109,6 +109,27 @@ button:disabled { opacity: .45; }
 .training-lab input[type=checkbox] { accent-color: var(--lab-action); }
 .touch-controls button { background: #141d23ed; color: white; border-color: #8d9b9e; width: 42px; height: 44px; }
 
+.camera-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 12px; padding: 10px 16px; border-block: 1px solid var(--lab-line); background: var(--lab-paper); }
+.camera-views { display: flex; gap: 3px; min-width: 0; margin: 0; padding: 3px; border: 0; border-radius: 7px; background: #eef1ed; }
+.camera-toolbar button { height: 34px; padding: 0 10px; border-radius: 5px; color: var(--lab-muted); font-size: 12px; }
+.camera-views button[aria-pressed=true] { background: var(--lab-night); color: var(--lab-night-text); }
+.camera-tools { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.camera-tools button:hover { background: #fff0e8; color: var(--lab-action); }
+.camera-toolbar .camera-rays { gap: 8px; }
+.camera-rays[aria-pressed=true] { background: #fff0e8; color: var(--lab-action); }
+.ray-status { width: 6px; height: 6px; border-radius: 50%; background: #8d9b9e; }
+.camera-rays[aria-pressed=true] .ray-status { background: var(--lab-action); }
+.camera-help { padding: 9px 16px; border-bottom: 1px solid var(--lab-line); background: var(--lab-surface); color: var(--lab-muted); font-size: 11px; line-height: 1.6; }
+.chase-map { position: absolute; bottom: 70px; left: 20px; width: 128px; padding: 10px; border: 1px solid #657178; border-radius: 7px; background: #141d23ed; pointer-events: none; }
+.chase-map svg { display: block; width: 100%; height: 68px; }
+.chase-map span { display: block; margin-top: 6px; color: var(--lab-night-muted); font: 9px var(--font-instruments); letter-spacing: 1px; text-align: center; }
+.camera-note { position: absolute; bottom: 18px; left: 18px; right: 18px; width: fit-content; max-width: calc(100% - 36px); padding: 8px 11px; border: 1px solid #657178; border-radius: 5px; background: #141d23ed; color: var(--lab-night-muted); font-size: 11px; pointer-events: none; }
+.canvas-host canvas.camera-interactive { cursor: grab; }
+.canvas-host canvas.camera-interactive:active { cursor: grabbing; }
+.canvas-host canvas.camera-interactive:focus-visible { outline: 2px solid var(--lab-orange); outline-offset: -2px; }
+.game-overlay.camera-overlay { pointer-events: none; background: #141d2366; }
+.game-overlay.camera-overlay button { pointer-events: auto; }
+
 @media(max-width:1100px) {
   .app-shell, .app-shell.debug-open { padding: 0 24px; }
   .workspace, .debug-open .workspace { grid-template-columns: 240px minmax(0,1fr); gap: 24px; }
@@ -137,11 +158,19 @@ button:disabled { opacity: .45; }
   .setup h2 { font-size: 23px; }
   .driver-mode { margin: 16px 0 20px; }
   .tracks { display: flex; gap: 8px; overflow-x: auto; padding: 1px 1px 9px; scroll-snap-type: x proximity; }
-  .track-option { flex: 0 0 130px; height: 89px !important; flex-direction: column !important; padding: 10px 5px !important; gap: 4px !important; scroll-snap-align: start; }
+  .track-option { flex: 0 0 130px; height: 104px !important; flex-direction: column !important; padding: 10px 5px !important; gap: 4px !important; scroll-snap-align: start; }
   .track-copy strong { font-size: 11px; }
   .track-copy small { font-size: 8px; }
   .race-panel { width: 100%; }
   .race-heading { padding: 16px; }
+  .camera-toolbar { padding: 8px; gap: 6px; }
+  .camera-views { width: 100%; }
+  .camera-views button { flex: 1; padding: 0 6px; font-size: 11px; }
+  .camera-views svg { width: 13px; }
+  .camera-help { padding: 9px 12px; }
+  .chase-map { left: 12px; bottom: 64px; width: 88px; padding: 6px; }
+  .chase-map svg { height: 48px; }
+  .chase-map span { font-size: 8px; }
   .game-view { height: 420px; }
   .hud { gap: 18px; }
   .hud strong { font-size: 14px; }

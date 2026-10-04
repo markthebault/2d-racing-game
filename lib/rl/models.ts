@@ -2,7 +2,7 @@ import type { FeatureSettings } from './features.ts';
 import { TRACKS } from '../race.ts';
 import type { Weights } from './agent.ts';
 import { OBSERVATION_SIZE, OBSERVATION_VERSION, PRESETS, type Preset } from './config.ts';
-import type { EvaluationSummary } from './evaluation.ts';
+import { EVALUATION_VERSION, type EvaluationSummary } from './evaluation.ts';
 export const MODEL_VERSION = 2;
 export const MODEL_PREFIX = 'pocket-circuit-model-v2-';
 export type Checkpoint = {
@@ -24,6 +24,9 @@ export function migrateModel(saved: StoredModel): Checkpoint {
       if (saved.weights?.[0]?.shape?.[0] !== oldSize || saved.weights[0].shape[1] !== 64 || saved.weights[0].values.length !== oldSize * 64) throw new Error('Incompatible saved weights.');
       const weights = saved.weights.map((w, i) => i === 0 ? { shape: [OBSERVATION_SIZE, 64], values: [...w.values, ...Array((OBSERVATION_SIZE - oldSize) * 64).fill(0)] } : { shape: [...w.shape], values: [...w.values] });
       return { ...saved, observationVersion: OBSERVATION_VERSION, evaluation: null, evaluations: [], weights };
+    }
+    if ((saved.evaluation && saved.evaluation.version !== EVALUATION_VERSION) || saved.evaluations?.some(result => result.version !== EVALUATION_VERSION)) {
+      return { ...saved, evaluation: null, evaluations: [] };
     }
     return saved;
   }

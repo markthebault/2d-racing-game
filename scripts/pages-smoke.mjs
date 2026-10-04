@@ -43,6 +43,33 @@ try {
   });
   await page.goto(origin, { waitUntil: 'networkidle' });
   await page.evaluate(() => document.fonts.ready);
+  const views = [['2D top', 'top'], ['3D chase', 'chase'], ['3D overhead', 'overhead']];
+  async function selectView(label, view, effective = view) {
+    await page.getByRole('button', { name: label, exact: true }).click();
+    await page.waitForFunction(([view, effective]) => {
+      const canvas = document.querySelector('.canvas-host canvas');
+      return canvas?.dataset.camera === view && canvas.dataset.effectiveCamera === effective;
+    }, [view, effective]);
+    assert.equal(await page.getByRole('button', { name: label, exact: true }).getAttribute('aria-pressed'), 'true');
+  }
+  async function responsiveViews(learning) {
+    for (const width of [320, 390, 768, 1024, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const [label, view] of views) {
+        await selectView(label, view, learning && view === 'chase' ? 'overhead' : view);
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `View ${view} overflows at ${width}px`);
+        const clipped = await page.locator('.camera-toolbar').evaluate(toolbar => {
+          const bounds = toolbar.getBoundingClientRect();
+          return [...toolbar.querySelectorAll('button')].filter(button => {
+            const box = button.getBoundingClientRect();
+            return box.left < bounds.left || box.right > bounds.right || box.top < bounds.top || box.bottom > bounds.bottom;
+          }).map(button => button.textContent);
+        });
+        assert.deepEqual(clipped, [], `Camera controls clipped at ${width}px`);
+      }
+    }
+    await selectView('2D top', 'top');
+  }
   assert.equal(await page.locator('h1').count(), 1);
   assert.equal(await page.locator('.track-option').count(), 5);
   await page.waitForSelector('.canvas-host canvas');
@@ -58,6 +85,14 @@ try {
     await page.waitForFunction(name => document.querySelector('.race-heading h2')?.textContent === name, circuit);
     await page.waitForSelector('.canvas-host canvas');
   }
+  for (const [label, view] of views) {
+    await selectView(label, view);
+    if (view !== 'top') {
+      await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+      await page.screenshot({ path: `docs/previews/${view}.png`, fullPage: true });
+    }
+  }
+  await selectView('2D top', 'top');
   await page.getByRole('button', { name: 'Fewer laps', exact: true }).click();
   await page.getByRole('button', { name: 'Fewer laps', exact: true }).click();
   assert.equal(await page.getByLabel('Number of laps').inputValue(), '1');
@@ -67,7 +102,15 @@ try {
   await page.waitForFunction(() => Number(document.querySelector('.speed strong')?.textContent) > 0);
   await page.keyboard.up('ArrowUp');
   await page.keyboard.press('Escape');
-  assert.equal(await page.getByRole('heading', { name: 'Taking a pit stop.' }).isVisible(), true);
+  await page.getByRole('heading', { name: 'Taking a pit stop.' }).waitFor();
+  const pausedTime = await page.locator('.hud strong').nth(1).innerText();
+  await page.evaluate(() => { window.__pagesCanvas = document.querySelector('.canvas-host canvas'); });
+  for (const [label, view] of views) {
+    await selectView(label, view);
+    assert.equal(await page.locator('.hud strong').nth(1).innerText(), pausedTime);
+    assert.equal(await page.evaluate(() => window.__pagesCanvas === document.querySelector('.canvas-host canvas')), true);
+  }
+  await selectView('2D top', 'top');
   await page.getByRole('button', { name: 'Resume race', exact: true }).click();
   await page.getByRole('button', { name: 'Reset race', exact: true }).click();
   await page.getByRole('button', { name: 'Expand debug menu', exact: true }).click();
@@ -93,20 +136,16 @@ try {
     assert.equal(await page.getByRole('tab', { name, exact: true }).getAttribute('aria-selected'), 'true');
   }
   await mkdir('docs/previews', { recursive: true });
+  await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
   await page.screenshot({ path: 'docs/previews/ai-desktop.png', fullPage: true });
-  for (const width of [320, 390, 768, 1024, 1440]) {
-    await page.setViewportSize({ width, height: 1000 });
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `AI view overflows at ${width}px`);
-  }
+  await responsiveViews(true);
+  assert.equal(await page.evaluate(() => window.__pagesStats.steps), pausedSteps);
   await page.getByRole('button', { name: 'Manual drive', exact: true }).click();
-  for (const width of [320, 390, 768, 1024, 1440]) {
-    await page.setViewportSize({ width, height: 1000 });
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Racing view overflows at ${width}px`);
-  }
-  await page.evaluate(() => scrollTo(0, 0));
+  await responsiveViews(false);
+  await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
   await page.screenshot({ path: 'docs/previews/desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.evaluate(() => scrollTo(0, 0));
+  await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
   await page.screenshot({ path: 'docs/previews/mobile.png', fullPage: true });
   await page.getByRole('button', { name: 'Start race', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('.mode-tag')?.textContent === 'TIME ATTACK');
@@ -120,7 +159,7 @@ try {
   await page.getByRole('button', { name: 'Reset race', exact: true }).click();
   assert.deepEqual(await page.evaluate(() => window.__pagesWorkerErrors), []);
   assert.deepEqual(errors, []);
-  console.log('Passed: five circuits, branding and image loading, keyboard and touch acceleration, pause/resume/reset, sensor controls, real static training worker, AI tabs, and five responsive widths.');
+  console.log('Passed: five circuits, branding and image loading, keyboard and touch acceleration, pause/resume/reset, sensor controls, real static training worker, AI tabs, and all three camera views at five responsive widths.');
 } finally {
   await browser?.close();
   preview?.kill();
