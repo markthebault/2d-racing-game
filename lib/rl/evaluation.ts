@@ -2,7 +2,7 @@ import { DEFAULT_MIN_DISTANCE } from './motion.ts';
 import { DrivingEnvironment, type StartPose } from './environment.ts';
 import type { Preset } from './config.ts';
 
-export const EVALUATION_VERSION = 5;
+export const EVALUATION_VERSION = 6;
 // Identical cases for every seed and experiment; independent of the training RNG.
 export const EVALUATION_STARTS: readonly (StartPose & { name: string })[] = [
   { name: 'Start line', fraction: 0, offset: 0, heading: 0 },

@@ -17,23 +17,26 @@ Open the local URL printed in your terminal. Choose a circuit and lap count.
 
 - Drive with the arrow keys. Escape pauses; R puts the car back on the track.
 - Switch between **2D top**, **3D chase**, and **3D overhead** above the circuit. Chase follows the formula car; overhead shows the entire circuit from far above. Camera changes preserve race and training progress. Fleet replays use the whole-circuit camera until a single best-model car appears. **Sensor rays** toggles the drawings without changing the AI's inputs.
-- During AI training, move the **3D overhead** camera with left-drag or arrow keys, rotate with right-drag, and zoom with the mouse wheel. **Shift + arrows** moves three times faster. **Fit track** restores the distant whole-circuit framing. Touch dragging pans and pinching zooms. The view remains where you put it through camera switches, paused replays and viewport resizing.
+- In manual mode and AI training, move the **3D overhead** camera with left-drag or arrow keys, rotate with right-drag, and zoom with the mouse wheel. **Shift + arrows** moves three times faster. In manual mode, arrows move the camera before starting and while paused or finished; during the countdown and race they control the car. Mouse camera controls remain available throughout the race. **Fit track** restores the distant whole-circuit framing. Touch dragging pans and pinching zooms. The view remains where you put it through camera switches, paused replays and viewport resizing.
+- Tire barriers are solid walls in manual driving, AI training and model playback. Contact stops the car; brake / reverse lets you back away. The physics includes the car body and wheels, sweeps fast movement to prevent passing through walls, and uses the same boundaries as the rendered tires. Saved weights still load, and old evaluation scores are cleared before reevaluation under the new physics.
 - Choose **Train AI → Start training** to teach the car. The default trains one model across Park Oval, Pine Bend and Desert Switchback.
 - Choose **Fastest** to collect attempts faster, then **Run best model** to watch it drive in real time. **Pause all** pauses learning and playback.
 
 Training runs locally with TensorFlow.js on the CPU in a browser worker. No Python server or API key needed. Saved model weights stay in your browser; refreshing ends the live training session.
 
-[Watch the browser demo of the 3D views and real trained-model playback](docs/videos/3d-racing-demo.mp4).
+[Watch the browser demo of the 3D views and real trained-model playback](docs/videos/3d-racing-demo.mp4). [Watch manual free-camera controls and solid tire-wall collisions](docs/videos/manual-camera-walls-demo.mp4).
 
-Camera and training checks against a production preview:
+Camera, wall collision and training checks against a production preview:
 
 ```sh
-node --test tests/camera.test.mjs
+node --test tests/camera.test.mjs tests/barriers.test.mjs
 RACING_URL=http://localhost:8090 node scripts/3d-browser.mjs
 RACING_URL=http://localhost:8090 node scripts/overhead-controls-browser.mjs
 ```
 
 The browser check covers every circuit and view, mobile sizing, manual controls, real guided training, fifteen three-lap evaluation starts, fleet replays from a separate fresh trial-and-error session, and pause/reset during model playback. It saves screenshots and a trained checkpoint under `outputs/3d-validation`. Set `TRAINED_MODEL` to an existing checkpoint file to retest loading and continued learning without repeating warm-up. With FFmpeg available, `node scripts/record-3d-demo.mjs` records that checkpoint driving through the real UI and creates the demo above (`RACING_URL` and `FFMPEG_PATH` can override the defaults).
+
+The overhead-controls check also covers camera movement in manual mode before racing, while driving and while paused; solid wall impacts under sustained throttle; reversing away; and real AI fleet groups 1–50 and 51–100. To record the manual demonstration, run `RACING_URL=http://localhost:8090 node scripts/record-camera-walls.mjs` with FFmpeg available (`FFMPEG_PATH` can select its executable).
 
 ## Training input controls
 

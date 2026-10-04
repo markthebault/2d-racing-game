@@ -12,7 +12,17 @@ const browser = await chromium.launch({
     '--enable-unsafe-swiftshader',
   ],
 });
-const page = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+const context = await browser.newContext({
+  viewport: { width: 1400, height: 950 },
+  ...(process.env.RECORD_VIDEO === '1'
+    ? { recordVideo: { dir: output, size: { width: 1400, height: 950 } } }
+    : {}),
+});
+const page = await context.newPage();
+const origin = Date.now();
+const clips = [];
+const stamp = (name) =>
+  clips.push({ name, time: (Date.now() - origin) / 1000 });
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
 page.on('console', (message) => {
@@ -120,6 +130,178 @@ try {
     waitUntil: 'domcontentloaded',
   });
   await canvas.waitFor({ timeout: 90000 });
+  await page
+    .getByRole('button', { name: 'Collapse debug menu', exact: true })
+    .click();
+  await page.getByRole('button', { name: '3D overhead', exact: true }).click();
+  await page.waitForFunction(() =>
+    document.querySelector('canvas.camera-interactive'),
+  );
+  await fit();
+  stamp('manual-navigation');
+  const manualInitial = await camera();
+  await holdArrow();
+  assert.ok(
+    (await camera()).position.distanceTo(manualInitial.position) > 1,
+    'Manual ready arrows pan',
+  );
+  await fit();
+  await drag('left', 60, 25);
+  const manualPan = await camera();
+  assert.ok(
+    manualPan.position.distanceTo(manualInitial.position) > 1,
+    'Manual ready mouse pans',
+  );
+  await drag('right', 50, 20);
+  const manualRotate = await camera();
+  assert.ok(
+    manualRotate.matrix.elements.some(
+      (value, i) =>
+        i < 12 && Math.abs(value - manualPan.matrix.elements[i]) > 0.01,
+    ),
+    'Manual right-drag rotates',
+  );
+  await page.mouse.wheel(0, -300);
+  await page.waitForTimeout(200);
+  assert.ok(
+    (await camera()).position.distanceTo(manualRotate.position) > 1,
+    'Manual wheel zooms',
+  );
+  await fit();
+  await page.getByRole('button', { name: 'Start race', exact: true }).click();
+  await page.locator('.countdown').waitFor();
+  await page
+    .locator('.countdown')
+    .waitFor({ state: 'detached', timeout: 15000 });
+  const beforeDriving = await camera();
+  await page.keyboard.down('ArrowUp');
+  await page.waitForTimeout(800);
+  await page.keyboard.up('ArrowUp');
+  assert.ok(
+    Number(await page.locator('.speed strong').innerText()) > 0,
+    'Manual arrows accelerate',
+  );
+  assert.ok(
+    (await camera()).position.distanceTo(beforeDriving.position) < 0.001,
+    'Driving does not move overhead camera',
+  );
+  await drag('left', 45, 20);
+  const racingPan = await camera();
+  assert.ok(
+    racingPan.position.distanceTo(beforeDriving.position) > 1,
+    'Mouse pans during a manual race',
+  );
+  await page.keyboard.press('Escape');
+  await page
+    .getByRole('button', { name: 'Resume race', exact: true })
+    .waitFor();
+  await holdArrow(true);
+  const pausedKeys = await camera();
+  assert.ok(
+    pausedKeys.position.distanceTo(racingPan.position) > 1,
+    'Paused Shift + arrows move camera',
+  );
+  await drag('left', -50, -20);
+  const pausedMouse = await camera();
+  assert.ok(
+    pausedMouse.position.distanceTo(pausedKeys.position) > 1,
+    'Pause overlay permits camera dragging',
+  );
+  await page
+    .locator('.race-panel')
+    .screenshot({ path: `${output}/manual-paused.png` });
+  await page.getByRole('button', { name: 'Resume race', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Resume race', exact: true })
+    .waitFor({ state: 'detached' });
+  assert.ok(
+    (await camera()).position.distanceTo(pausedMouse.position) < 0.001,
+    'Resume keeps custom overhead position',
+  );
+  await page.getByRole('button', { name: 'Reset race', exact: true }).click();
+  await fit();
+  console.log(
+    'PASS: manual ready, racing and paused camera controls; arrows drive during the race, Escape and Resume work.',
+  );
+  await page.getByRole('button', { name: 'Start race', exact: true }).click();
+  await page.locator('.countdown').waitFor();
+  await page
+    .locator('.countdown')
+    .waitFor({ state: 'detached', timeout: 15000 });
+  stamp('manual-wall');
+  await page.keyboard.down('ArrowUp');
+  await page.keyboard.down('ArrowRight');
+  await page.waitForFunction(
+    () => Number(document.querySelector('.speed strong')?.textContent) > 5,
+  );
+  await page.waitForFunction(
+    () => Number(document.querySelector('.speed strong')?.textContent) === 0,
+    null,
+    { timeout: 60000 },
+  );
+  const position = async () => {
+    await page
+      .getByRole('button', { name: 'Expand debug menu', exact: true })
+      .click();
+    const value = {
+      x: Number(
+        await page
+          .locator('dt', { hasText: 'Position X' })
+          .locator('..')
+          .locator('dd')
+          .innerText(),
+      ),
+      z: Number(
+        await page
+          .locator('dt', { hasText: 'Position Z' })
+          .locator('..')
+          .locator('dd')
+          .innerText(),
+      ),
+    };
+    await page
+      .getByRole('button', { name: 'Collapse debug menu', exact: true })
+      .click();
+    return value;
+  };
+  const contactPosition = await position();
+  await page.waitForTimeout(2000);
+  assert.equal(
+    Number(await page.locator('.speed strong').innerText()),
+    0,
+    'Holding gas against a tire wall stays stopped',
+  );
+  assert.deepEqual(
+    await position(),
+    contactPosition,
+    'Car cannot creep through the tire wall',
+  );
+  await page.keyboard.up('ArrowUp');
+  await page.keyboard.up('ArrowRight');
+  await page.keyboard.press('Escape');
+  await page
+    .getByRole('button', { name: 'Resume race', exact: true })
+    .waitFor();
+  await page
+    .locator('.race-panel')
+    .screenshot({ path: `${output}/manual-wall.png` });
+  stamp('manual-wall-contact');
+  await page.getByRole('button', { name: 'Resume race', exact: true }).click();
+  await page.keyboard.down('ArrowDown');
+  await page.waitForTimeout(3000);
+  await page.keyboard.up('ArrowDown');
+  const reversedPosition = await position();
+  assert.ok(
+    Math.hypot(
+      reversedPosition.x - contactPosition.x,
+      reversedPosition.z - contactPosition.z,
+    ) > 0.5,
+    'Manual reverse gets away from the wall',
+  );
+  await page.getByRole('button', { name: 'Reset race', exact: true }).click();
+  console.log(
+    'PASS: manual car hits the tire barrier, stays stopped under gas, and reverses away.',
+  );
   await page.getByRole('button', { name: 'Train AI', exact: true }).click();
   await wait(() => window.__overhead.stats?.status === 'ready');
   await page.getByRole('button', { name: '3D overhead', exact: true }).click();
@@ -260,6 +442,7 @@ try {
     await page
       .locator('.race-panel')
       .screenshot({ path: `${output}/replay-${first}.png` });
+    stamp(`replay-${first}`);
     console.log(
       `PASS: episodes ${first}–${first + 49} render; camera controls preserve the paused learner and replay.`,
     );
@@ -281,8 +464,8 @@ try {
     'Arrow keys in inputs do not pan',
   );
   await page.getByRole('button', { name: 'Manual drive', exact: true }).click();
-  await page.waitForFunction(
-    () => !document.querySelector('canvas.camera-interactive'),
+  await page.waitForFunction(() =>
+    document.querySelector('canvas.camera-interactive'),
   );
   await page.getByRole('button', { name: 'Start race', exact: true }).click();
   await page.locator('.countdown').waitFor();
@@ -301,7 +484,7 @@ try {
   await writeFile(
     `${output}/report.json`,
     JSON.stringify(
-      { normalDistance, fastDistance, replayGroups: [1, 51], errors },
+      { normalDistance, fastDistance, replayGroups: [1, 51], clips, errors },
       null,
       2,
     ),
@@ -321,5 +504,8 @@ try {
   await page.screenshot({ path: `${output}/failure.png` });
   throw error;
 } finally {
+  await context.close();
+  if (page.video())
+    console.log('Recorded browser video:', await page.video().path());
   await browser.close();
 }

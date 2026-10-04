@@ -381,3 +381,7 @@ body {
 }
 .lab-pending { display:inline-block; margin-left:8px; font-size:12px; font-weight:400; color:#daef8c; }
 .batch-summary .lab-help small { display:block; margin:8px 0; }
+
+.camera-help { padding:9px 16px; background:#19251f; border-bottom:1px solid #3b493e; color:#b4c3ae; font-size:11px; line-height:1.6; }
+.game-overlay.camera-overlay { pointer-events:none; background:#14221f66; }
+.game-overlay.camera-overlay button { pointer-events:auto; }

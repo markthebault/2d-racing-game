@@ -1,3 +1,4 @@
+import { BarrierWorld, trackBarriers, TIRE_RADIUS } from './barriers';
 import { registerRaceTools } from './webmcp';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -34,6 +35,8 @@ export class RaceEngine {
   private bounds: ReturnType<typeof trackBounds>;
   private roadScale: number;
   private edges: EdgeSegment[];
+  private barrierLayout: ReturnType<typeof trackBarriers>;
+  private barriers: BarrierWorld;
   private sensorOverlay: SensorOverlay;
   private keys = new Set<string>();
   private steering = new ProgressiveSteering();
@@ -63,6 +66,8 @@ export class RaceEngine {
     this.cameras=new RaceCamera(this.points);
     this.bounds=trackBounds(this.points);
     this.roadScale=TRACKS[track].roadScale;
+    this.barrierLayout=trackBarriers(this.points,this.roadScale);
+    this.barriers=new BarrierWorld(this.barrierLayout.walls);
     this.edges=trackEdges(this.points,ROAD_EDGE_OFFSET*this.roadScale);
     this.sensorOverlay=new SensorOverlay(this.scene);
     this.scene.add(new THREE.AmbientLight(0xffffff,1.6));
@@ -145,17 +150,14 @@ export class RaceEngine {
     this.box(3,.12,1.4,'#f4ecdb',start.x+1.3,2,start.z+7.2);
   }
   private buildBarriers() {
-    const barriers=new THREE.InstancedMesh(new THREE.CylinderGeometry(.4,.4,.65,10),new THREE.MeshStandardMaterial({roughness:1}),this.points.length*2);
+    const tires=this.barrierLayout.tires;
+    const barriers=new THREE.InstancedMesh(new THREE.CylinderGeometry(TIRE_RADIUS,TIRE_RADIUS,.65,10),new THREE.MeshStandardMaterial({roughness:1}),tires.length);
     const transform=new THREE.Object3D(),color=new THREE.Color();
-    let count=0;
-    for(let i=0;i<this.points.length;i++)for(const side of [-1,1]) {
-      const point=offsetTrackPoint(this.points,i,side*6.8*this.roadScale);
-      // Keep decorations clear of neighboring legs on the technical circuits.
-      if(nearestPoint(this.points,point.x,point.z).distance<6*this.roadScale)continue;
-      transform.position.set(point.x,.33,point.z);transform.updateMatrix();
-      barriers.setMatrixAt(count,transform.matrix);barriers.setColorAt(count,color.set(Math.floor(i/8)%5===0?'#c94f40':'#202629'));count++;
-    }
-    barriers.count=count;barriers.castShadow=true;barriers.receiveShadow=true;this.scene.add(barriers);
+    tires.forEach((tire,index)=>{
+      transform.position.set(tire.x,.33,tire.z);transform.updateMatrix();
+      barriers.setMatrixAt(index,transform.matrix);barriers.setColorAt(index,color.set(Math.floor(tire.index/8)%5===0?'#c94f40':'#202629'));
+    });
+    barriers.castShadow=true;barriers.receiveShadow=true;this.scene.add(barriers);
   }
   private buildCar() {
     this.scene.add(this.car);
@@ -166,39 +168,39 @@ export class RaceEngine {
   setExternal=(enabled:boolean)=>{this.external=enabled;this.agentFrame=null;this.reset();this.car.visible=!enabled;this.sensorOverlay.group.visible=!enabled&&this.raysVisible;this.needsRender=true;this.shadowDirty=true;};
   showFleet=(frame:FleetFrame|null)=>{if(!this.external)return;this.shadowDirty ||= this.car.visible;this.car.visible=false;this.sensorOverlay.group.visible=false;if(frame&&!this.fleet)this.fleet=new GhostFleet(this.car,this.scene);this.fleet?.show(frame);this.needsRender=true;};
   showAgent=(frame:AgentFrame)=>{if(!this.external)return;this.car.visible=true;this.fleet?.show(null);this.sensorOverlay.group.visible=this.raysVisible;this.agentFrame=frame;this.car.position.set(frame.x,0,frame.z);this.heading=frame.heading;this.car.rotation.y=-frame.heading;this.stats.speed=frame.speed;this.stats.time=frame.time;this.stats.lap=frame.completedLaps;this.stats.offroad=frame.offroad;this.stats.status='racing';if(frame.time===0)this.cameras.resetFollow();this.needsRender=true;this.shadowDirty=true;this.updateSensors();this.emit();};
-  reset=()=>{this.stats={status:'ready',speed:0,lap:0,time:0,best:0,countdown:3,offroad:false,rays:[],vehicle:vehicleTelemetry()};this.progress={previous:0,distance:0,laps:0};this.lapStart=0;this.keys.clear();this.placeAt(0);this.emit();};
+  reset=()=>{this.stats={status:'ready',speed:0,lap:0,time:0,best:0,countdown:3,offroad:false,rays:[],vehicle:vehicleTelemetry()};this.progress={previous:0,distance:0,laps:0};this.lapStart=0;this.keys.clear();this.cameraKeys.clear();this.placeAt(0);this.emit();};
   start=()=>{if(this.external)return;this.reset();this.stats.status='countdown';this.countdownTime=3;this.emit();};
-  togglePause=()=>{if(this.external)return;if(this.stats.status==='racing')this.stats.status='paused';else if(this.stats.status==='paused')this.stats.status='racing';this.keys.clear();this.steering.reset();this.emit();};
+  togglePause=()=>{if(this.external)return;if(this.stats.status==='racing')this.stats.status='paused';else if(this.stats.status==='paused')this.stats.status='racing';this.keys.clear();this.cameraKeys.clear();this.steering.reset();this.emit();};
   setKey=(key:string,pressed:boolean)=>{if(this.external)return;if(pressed)this.keys.add(key);else this.keys.delete(key);};
   setRaysVisible=(visible:boolean)=>{this.raysVisible=visible;this.sensorOverlay.group.visible=visible&&this.car.visible;this.needsRender=true;};
   setCameraView=(view:CameraView)=>{this.cameraKeys.clear();this.cameras.setView(view);this.needsRender=true;};
   resetOverheadCamera=()=>{this.cameraKeys.clear();this.cameras.resetOverhead();this.overheadControls.update();this.needsRender=true;};
   private cameraChanged=()=>{this.cameras.markOverheadMoved();this.cameras.overhead.updateMatrixWorld();this.needsRender=true;};
   private updateCameraControls(dt:number) {
-    const controls=this.overheadControls,enabled=this.external&&this.cameras.effectiveView==='overhead';
+    const controls=this.overheadControls,enabled=this.cameras.effectiveView==='overhead';
     if(controls.enabled!==enabled) {
       controls.enabled=enabled;this.cameraKeys.clear();
       if(enabled){controls.connect(this.renderer.domElement);controls.cursorStyle='grab';}else controls.disconnect();
       this.renderer.domElement.classList.toggle('camera-interactive',enabled);
       this.renderer.domElement.tabIndex=enabled?0:-1;
     }
-    if(!enabled)return;
+    if(!this.canMoveCameraWithKeys()){this.cameraKeys.clear();return;}
     const x=Number(this.cameraKeys.has('ArrowRight'))-Number(this.cameraKeys.has('ArrowLeft'));
     const y=Number(this.cameraKeys.has('ArrowUp'))-Number(this.cameraKeys.has('ArrowDown'));
     if(!x&&!y)return;
     const pixels=240*dt*(this.cameraKeys.has('Shift')?3:1)/Math.hypot(x,y);
     controls.pan(-x*pixels,y*pixels);
   }
+  private canMoveCameraWithKeys(){return this.overheadControls.enabled&&(this.external||this.stats.status==='ready'||this.stats.status==='paused'||this.stats.status==='finished');}
   private updateSensors(){if(this.external&&!this.car.visible)return;this.stats.rays=senseTrack(this.car.position,this.heading,this.edges);this.sensorOverlay.update(this.stats.rays);}
   private placeAt(index:number){const p=this.points[index],n=this.points[(index+1)%600];this.car.position.set(p.x,0,p.z);this.heading=Math.atan2(n.z-p.z,n.x-p.x);this.car.rotation.y=-this.heading;this.stats.speed=0;this.steering.reset();this.cameras.resetFollow();this.needsRender=true;this.shadowDirty=true;this.updateSensors();}
   private keyDown=(e:KeyboardEvent)=>{
     if((e.target as HTMLElement)?.closest('input,textarea,select,[contenteditable="true"],[role="tablist"]')){this.cameraKeys.clear();return;}
-    if(this.external) {
-      if(!this.overheadControls.enabled||e.ctrlKey||e.metaKey||e.altKey)return;
-      if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();this.cameraKeys.add(e.key);if(e.shiftKey)this.cameraKeys.add('Shift');}
-      else if(e.key==='Shift')this.cameraKeys.add('Shift');
-      return;
+    if(this.canMoveCameraWithKeys()&&!e.ctrlKey&&!e.metaKey&&!e.altKey) {
+      if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();this.cameraKeys.add(e.key);if(e.shiftKey)this.cameraKeys.add('Shift');return;}
+      if(e.key==='Shift'){this.cameraKeys.add('Shift');return;}
     }
+    if(this.external)return;
     if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Escape','r','R'].includes(e.key)){e.preventDefault();if(e.key==='Escape'&&!e.repeat)this.togglePause();else if(e.key.toLowerCase()==='r'&&!e.repeat&&this.stats.status==='racing')this.placeAt(this.progress.previous);else this.setKey(e.key,true);}
   };
   private keyUp=(e:KeyboardEvent)=>{this.cameraKeys.delete(e.key);this.setKey(e.key,false);};
@@ -214,7 +216,7 @@ export class RaceEngine {
       const near=nearestPoint(this.points,this.car.position.x,this.car.position.z);this.stats.offroad=near.distance>ROAD_WIDTH*this.roadScale/2;
       const input=drivingInput(this.keys,true);
       const state={x:this.car.position.x,z:this.car.position.z,heading:this.heading,speed:this.stats.speed};
-      stepVehicle(state,input,this.steering,dt,this.stats.offroad,this.bounds);
+      stepVehicle(state,input,this.steering,dt,this.stats.offroad,this.bounds,this.barriers);
       this.heading=state.heading;this.stats.speed=state.speed;this.car.position.set(state.x,0,state.z);this.car.rotation.y=-this.heading;
       this.needsRender=true;this.shadowDirty=true;
       const next=nearestPoint(this.points,this.car.position.x,this.car.position.z);

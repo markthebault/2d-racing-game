@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DrivingEnvironment } from '../lib/rl/environment.ts';
 import { CHECKPOINT_COUNTS, OBSERVATION_SIZE, OBSERVATION_VERSION } from '../lib/rl/config.ts';
-import { EvaluationSuite, summarizeEvaluation, EVALUATION_STARTS, betterEvaluation } from '../lib/rl/evaluation.ts';
+import { EvaluationSuite, summarizeEvaluation, EVALUATION_STARTS, betterEvaluation, EVALUATION_VERSION } from '../lib/rl/evaluation.ts';
 import { DQNAgent, initializeTensorflow } from '../lib/rl/agent.ts';
 import { migrateModel } from '../lib/rl/models.ts';
 
@@ -63,4 +63,12 @@ test('34-input saved models retain learned rows and gain zero-weight lap inputs'
     assert.equal(model.evaluation,null);assert.equal(model.observationVersion,OBSERVATION_VERSION);agent.loadWeights(model.weights);
     assert.equal(JSON.stringify(saved),original);
   }finally{agent.dispose();}
+});
+
+test('solid-wall physics invalidates old evaluations while preserving saved weights', () => {
+  const saved={version:2,observationVersion:OBSERVATION_VERSION,id:'pre-walls',track:0,preset:'local',seed:42,episode:50,trainedTracks:[0],parentId:null,evaluation:{version:EVALUATION_VERSION-1},evaluations:[{version:EVALUATION_VERSION-1}],weights:[]};
+  const original=JSON.stringify(saved), migrated=migrateModel(saved);
+  assert.equal(migrated.evaluation,null);assert.deepEqual(migrated.evaluations,[]);assert.equal(migrated.weights,saved.weights);assert.equal(JSON.stringify(saved),original);
+  const current={...saved,evaluation:{version:EVALUATION_VERSION},evaluations:[{version:EVALUATION_VERSION}]};
+  assert.equal(migrateModel(current),current);
 });
