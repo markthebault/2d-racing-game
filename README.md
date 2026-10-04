@@ -34,7 +34,7 @@ npm run preview
 
 The Vite build writes a static site to `dist`, including the AI training worker. `test:pages` checks that built site in installed Chrome: all five circuits, keyboard and touch controls, pause/reset, sensor tools, real worker training, and mobile layouts. Set `RACING_BROWSER_CHANNEL=chromium` to use Playwright Chromium, or `RACING_URL` to check the live site. Preview captures go to `docs/previews`. The existing worker regression scripts read the bundled worker from `dist/assets`.
 
-Cloudflare Pages project: `pocket-circuit`. Connected repository: `markthebault/2d-racing-game`. Pushes to `main` deploy automatically with build command `npm run build`, output `dist`, repository root and no framework preset. `.node-version` pins Node 22.16.0 for Cloudflare and CI. Custom domain: `circuit.mthracelab.com`; Pages address: `pocket-circuit.pages.dev`.
+Cloudflare Pages project: `pocket-circuit`. Connected repository: `markthebault/2d-racing-game`. Pushes to `main` deploy automatically with build command `npm run build`, output `dist`, repository root and no framework preset. `.node-version` pins Node 22.16.0 for Cloudflare and CI. Custom domain: `circuit.mthracelab.com`; Pages address: `pocket-circuit-5xm.pages.dev`.
 
 Hosting uses the free static Pages service. There are no Pages Functions, server Workers, databases, or paid bindings. The browser Web Worker runs on the visitor's device. Credentials remain outside the repository, and changing hosting origins gives each origin its own browser-local model storage.
 
