@@ -1,15 +1,17 @@
 # Pocket Circuit
 
-A small top-down racing game built with Three.js. Drive it yourself, or watch a neural network learn to race. Five circuits, 1–10 laps, all in your browser.
+A small racing game built with Three.js, with 2D top, 3D chase and 3D overhead views. Drive it yourself, or watch a neural network learn to race. Five circuits, 1–10 laps, all in your browser.
 
-![Pocket Circuit showing the Park Oval track, ray sensors, and circuit selection menu](docs/images/pocket-circuit.png)
+Play at [circuit.mthracelab.com](https://circuit.mthracelab.com/). Part of [MTH Race Lab](https://mthracelab.com/), using its shared logo, Inter typeface, off-white/slate surfaces and orange accents. The project cover is a [generated illustration with a recorded prompt](docs/project-artwork.md).
+
+![Pocket Circuit in the MTH Race Lab style, with the Park Oval track and circuit selection](docs/previews/desktop.png)
 
 ## Run the simulation
 
 Use Node.js 22.13 or newer and a browser with WebGL enabled.
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
@@ -24,19 +26,37 @@ Open the local URL printed in your terminal. Choose a circuit and lap count.
 
 Training runs locally with TensorFlow.js on the CPU in a browser worker. No Python server or API key needed. Saved model weights stay in your browser; refreshing ends the live training session.
 
+## Camera and collision checks
+
 [Watch the browser demo of the 3D views and real trained-model playback](docs/videos/3d-racing-demo.mp4). [Watch manual free-camera controls and solid tire-wall collisions](docs/videos/manual-camera-walls-demo.mp4).
 
 Camera, wall collision and training checks against a production preview:
 
 ```sh
-node --test tests/camera.test.mjs tests/barriers.test.mjs
+node --experimental-strip-types --test tests/camera.test.mjs tests/barriers.test.mjs
 RACING_URL=http://localhost:8090 node scripts/3d-browser.mjs
 RACING_URL=http://localhost:8090 node scripts/overhead-controls-browser.mjs
 ```
 
 The browser check covers every circuit and view, mobile sizing, manual controls, real guided training, fifteen three-lap evaluation starts, fleet replays from a separate fresh trial-and-error session, and pause/reset during model playback. It saves screenshots and a trained checkpoint under `outputs/3d-validation`. Set `TRAINED_MODEL` to an existing checkpoint file to retest loading and continued learning without repeating warm-up. With FFmpeg available, `node scripts/record-3d-demo.mjs` records that checkpoint driving through the real UI and creates the demo above (`RACING_URL` and `FFMPEG_PATH` can override the defaults).
 
-The overhead-controls check also covers camera movement in manual mode before racing, while driving and while paused; solid wall impacts under sustained throttle; reversing away; and real AI fleet groups 1–50 and 51–100. To record the manual demonstration, run `RACING_URL=http://localhost:8090 node scripts/record-camera-walls.mjs` with FFmpeg available (`FFMPEG_PATH` can select its executable).
+The overhead-controls check also covers camera movement in manual mode before racing, while driving and while paused; solid wall impacts under sustained throttle; reversing away; and real AI fleet groups 1–50 and 51–100. Set `RACING_BROWSER_CHANNEL=chrome` to use installed Chrome instead of Playwright's bundled Chromium. To record the manual demonstration, run `RACING_URL=http://localhost:8090 node scripts/record-camera-walls.mjs` with FFmpeg available (`FFMPEG_PATH` can select its executable).
+
+[Preview the styled chase camera](docs/previews/chase.png) and [overhead camera](docs/previews/overhead.png).
+## Build, check and deploy
+
+```sh
+npm run build
+npm test
+npm run test:pages
+npm run preview
+```
+
+The Vite build writes a static site to `dist`, including the AI training worker. `test:pages` checks that built site in installed Chrome: all five circuits, keyboard and touch controls, pause/reset, sensor tools, real worker training, and all three cameras at five viewport widths in both driving modes. Set `RACING_BROWSER_CHANNEL=chromium` to use Playwright Chromium, or `RACING_URL` to check the live site. Preview captures go to `docs/previews`. The existing worker regression scripts read the bundled worker from `dist/assets`; on Node 22, run them with `node --experimental-strip-types`.
+
+Cloudflare Pages project: `pocket-circuit`. Connected repository: `markthebault/2d-racing-game`. Pushes to `main` deploy automatically with build command `npm run build`, output `dist`, repository root and no framework preset. `.node-version` pins Node 22.16.0 for Cloudflare and CI. Custom domain: `circuit.mthracelab.com`; Pages address: `pocket-circuit-5xm.pages.dev`.
+
+Hosting uses the free static Pages service. There are no Pages Functions, server Workers, databases, or paid bindings. The browser Web Worker runs on the visitor's device. Credentials remain outside the repository, and changing hosting origins gives each origin its own browser-local model storage.
 
 ## Training input controls
 

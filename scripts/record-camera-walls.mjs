@@ -10,6 +10,7 @@ await mkdir(output, { recursive: true });
 await mkdir(destination, { recursive: true });
 const ffmpeg = process.env.FFMPEG_PATH || 'ffmpeg';
 const browser = await chromium.launch({
+  channel: process.env.RACING_BROWSER_CHANNEL,
   args: [
     '--no-sandbox',
     '--use-angle=swiftshader',
@@ -31,6 +32,7 @@ const origin = Date.now(),
 const mark = (name) => clips.push({ name, time: (Date.now() - origin) / 1000 });
 const canvas = page.locator('.canvas-host canvas');
 async function drag(button, dx, dy) {
+  await canvas.scrollIntoViewIfNeeded();
   const box = await canvas.boundingBox();
   await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.5);
   await page.mouse.down({ button });
@@ -46,15 +48,13 @@ try {
     waitUntil: 'domcontentloaded',
   });
   await canvas.waitFor({ timeout: 90000 });
-  await page
-    .getByRole('button', { name: 'Collapse debug menu', exact: true })
-    .click();
-  await page.getByRole('button', { name: 'Sensor rays', exact: true }).click();
+  assert.equal(await page.getByRole('button', { name: 'Expand debug menu', exact: true }).count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'Sensor rays', exact: true }).getAttribute('aria-pressed'), 'false');
   await page.getByRole('button', { name: '3D overhead', exact: true }).click();
   await page.waitForFunction(() =>
     document.querySelector('canvas.camera-interactive'),
   );
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.locator('.race-panel').scrollIntoViewIfNeeded();
   mark('Manual free camera');
   await drag('right', 55, -15);
   await drag('left', 30, -20);
@@ -75,7 +75,7 @@ try {
   await page
     .locator('.countdown')
     .waitFor({ state: 'detached', timeout: 15000 });
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.locator('.race-panel').scrollIntoViewIfNeeded();
   mark('Driving into a solid tire wall');
   await page.keyboard.down('ArrowUp');
   await page.keyboard.down('ArrowRight');

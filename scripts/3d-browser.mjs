@@ -8,6 +8,7 @@ const sourceModel = process.env.TRAINED_MODEL
   ? JSON.parse(await readFile(process.env.TRAINED_MODEL, 'utf8'))
   : null;
 const browser = await chromium.launch({
+  channel: process.env.RACING_BROWSER_CHANNEL,
   args: [
     '--no-sandbox',
     '--use-angle=swiftshader',
@@ -97,10 +98,8 @@ try {
     timeout: 90000,
   });
   await page.locator('.canvas-host canvas').waitFor({ timeout: 90000 });
-  await page
-    .getByRole('button', { name: 'Collapse debug menu', exact: true })
-    .click();
-  await page.getByRole('button', { name: 'Sensor rays', exact: true }).click();
+  assert.equal(await page.getByRole('button', { name: 'Expand debug menu', exact: true }).count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'Sensor rays', exact: true }).getAttribute('aria-pressed'), 'false');
   for (let track = 0; track < 5; track++) {
     await page.locator('.track-option').nth(track).click();
     for (const [label, mode] of [

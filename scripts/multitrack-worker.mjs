@@ -3,7 +3,7 @@ import { readdir } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
-const folder=resolve('dist/client/_next/static');
+const folder=resolve('dist/assets');
 const file=(await readdir(folder)).find(n=>/^training\.worker-.*\.js$/.test(n));
 const script=`import {parentPort} from 'node:worker_threads';globalThis.self=globalThis;globalThis.process=undefined;globalThis.WorkerGlobalScope=class{};globalThis.postMessage=m=>parentPort.postMessage(m);await import(${JSON.stringify(pathToFileURL(resolve(folder,file)).href)});parentPort.on('message',data=>globalThis.onmessage({data}));`;
 const worker=new Worker(new URL('data:text/javascript,'+encodeURIComponent(script)),{type:'module'});

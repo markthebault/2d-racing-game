@@ -30,6 +30,7 @@ if (recordOnly) {
   );
 }
 const browser = await chromium.launch({
+  channel: process.env.RACING_BROWSER_CHANNEL,
   args: [
     '--no-sandbox',
     '--use-angle=swiftshader',
@@ -81,10 +82,8 @@ try {
     waitUntil: 'domcontentloaded',
   });
   await page.locator('.canvas-host canvas').waitFor();
-  await page
-    .getByRole('button', { name: 'Collapse debug menu', exact: true })
-    .click();
-  await page.getByRole('button', { name: 'Sensor rays', exact: true }).click();
+  assert.equal(await page.getByRole('button', { name: 'Expand debug menu', exact: true }).count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'Sensor rays', exact: true }).getAttribute('aria-pressed'), 'false');
   await page.getByRole('button', { name: '3D chase', exact: true }).click();
   await page.getByRole('button', { name: 'Train AI', exact: true }).click();
   await wait(() => window.__demoStats?.status === 'ready');

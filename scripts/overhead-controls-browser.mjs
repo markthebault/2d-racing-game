@@ -6,6 +6,7 @@ import * as THREE from 'three';
 const output = 'outputs/overhead-controls';
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({
+  channel: process.env.RACING_BROWSER_CHANNEL,
   args: [
     '--no-sandbox',
     '--use-angle=swiftshader',
@@ -116,6 +117,7 @@ async function holdArrow(shift = false) {
   await page.waitForTimeout(100);
 }
 async function drag(button, dx, dy) {
+  await canvas.scrollIntoViewIfNeeded();
   const box = await canvas.boundingBox();
   const x = box.x + box.width / 2,
     y = box.y + box.height / 2;
@@ -130,9 +132,7 @@ try {
     waitUntil: 'domcontentloaded',
   });
   await canvas.waitFor({ timeout: 90000 });
-  await page
-    .getByRole('button', { name: 'Collapse debug menu', exact: true })
-    .click();
+  assert.equal(await page.getByRole('button', { name: 'Expand debug menu', exact: true }).count(), 1);
   await page.getByRole('button', { name: '3D overhead', exact: true }).click();
   await page.waitForFunction(() =>
     document.querySelector('canvas.camera-interactive'),
