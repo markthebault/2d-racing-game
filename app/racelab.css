@@ -1,0 +1,170 @@
+/* Shared MTH Race Lab colours, copied from the landing page visual charter. */
+:root {
+  --lab-paper: #f7f8f5;
+  --lab-surface: #ffffff;
+  --lab-ink: #252e31;
+  --lab-muted: #586568;
+  --lab-line: #dce2de;
+  --lab-night: #141d23;
+  --lab-night-text: #f7f8f5;
+  --lab-night-muted: #b6c1c5;
+  --lab-orange: #ff8855;
+  --lab-action: #bd4000;
+  --lab-radius: 10px;
+  --lab-content: 1180px;
+  --font-inter: 'Inter Variable', Inter, sans-serif;
+  --font-instruments: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --background: var(--lab-paper);
+  --foreground: var(--lab-ink);
+  --card: var(--lab-surface);
+  --card-foreground: var(--lab-ink);
+  --popover: var(--lab-surface);
+  --popover-foreground: var(--lab-ink);
+  --secondary: #eef1ed;
+  --secondary-foreground: var(--lab-ink);
+  --accent: #fff0e8;
+  --accent-foreground: var(--lab-ink);
+  --primary: var(--lab-action);
+  --primary-foreground: #ffffff;
+}
+
+html { scroll-behavior: smooth; }
+body { font-family: var(--font-inter); }
+a { color: inherit; }
+button:disabled { opacity: .45; }
+[hidden] { display: none !important; }
+.app-shell, .app-shell.debug-open { max-width: calc(var(--lab-content) + 64px); padding: 0 32px; }
+.skip-link { position: fixed; top: 12px; left: 12px; z-index: 60; background: var(--lab-night); color: white; padding: 12px 18px; transform: translateY(-160%); border-radius: 6px; }
+.skip-link:focus { transform: none; }
+.topbar { height: 88px; border-color: var(--lab-line); gap: 20px; }
+.brand-family { display: flex; align-items: center; gap: 20px; }
+.brand { display: block; line-height: 0; }
+.brand img { width: 218px; height: auto; }
+.product-name { padding-left: 20px; border-left: 1px solid var(--lab-line); color: var(--lab-muted); font-size: 12px; font-weight: 550; }
+.topbar nav { display: flex; gap: 24px; font-size: 12px; font-weight: 550; }
+.topbar nav a { display: flex; align-items: center; gap: 6px; text-decoration: none; }
+.topbar nav a:hover { color: var(--lab-action); }
+.project-hero { display: grid; grid-template-columns: 1fr 350px; align-items: center; gap: 36px; margin-top: 28px; padding: 30px 36px; border-radius: var(--lab-radius); background: var(--lab-night); color: var(--lab-night-text); overflow: hidden; }
+.project-hero .eyebrow { display: flex; align-items: center; gap: 9px; color: var(--lab-night-muted); font: 600 9px var(--font-inter); letter-spacing: 1.7px; }
+.live-dot { background: var(--lab-orange); }
+.project-hero h1 { font-size: clamp(36px, 4vw, 48px); font-weight: 750; line-height: 1.04; letter-spacing: -2px; margin: 15px 0 12px; }
+.project-hero h1 em { font-style: normal; color: var(--lab-orange); }
+.project-hero p { font-size: 13px; color: var(--lab-night-muted); line-height: 1.7; }
+.hero-details { display: flex; flex-wrap: wrap; gap: 0; margin-top: 18px; color: var(--lab-night-muted); font-size: 10px; }
+.hero-details span + span::before { content: '/'; display: inline-block; margin: 0 12px; color: #66777e; }
+.hero-art { margin: 0; }
+.hero-art img { display: block; width: 100%; height: 208px; object-fit: cover; border-radius: 7px; }
+.hero-art figcaption { margin-top: 11px; font: 9px var(--font-instruments); letter-spacing: 1px; color: var(--lab-night-muted); }
+.workspace, .debug-open .workspace { grid-template-columns: 270px minmax(0, 1fr); gap: 30px; padding: 32px 0; scroll-margin-top: 20px; }
+.setup h2 { font-size: 25px; font-weight: 700; line-height: 1.2; letter-spacing: -.8px; margin: 10px 0; }
+.setup .eyebrow { color: var(--lab-action); font: 650 9px var(--font-inter); letter-spacing: 1.7px; }
+.intro { margin-bottom: 20px; font-size: 12px; line-height: 1.7; }
+.driver-mode { margin: 20px 0 24px; background: #eef1ed; border: 0; padding: 4px; min-width: 0; }
+.driver-mode button { font-size: 12px; border-radius: 6px; }
+.driver-mode button[aria-pressed=true] { background: var(--lab-night); color: white; }
+.track-option { height: 73px !important; color: var(--lab-muted) !important; border-color: var(--lab-line) !important; }
+.track-option.selected { border-color: var(--lab-action) !important; color: var(--lab-action) !important; }
+.track-copy strong { color: var(--lab-ink); font-size: 13px; font-weight: 600; }
+.track-copy small { font-size: 9px; }
+.track-option .track-map { width: 56px !important; height: 40px !important; }
+.track-description { font-size: 11px; }
+.start-button { background: var(--lab-action) !important; color: #fff !important; border-radius: 7px !important; font-size: 13px !important; }
+.start-button:hover { background: #a83800 !important; }
+.section-label { font-size: 9px; letter-spacing: .8px; }
+.race-panel { border-color: var(--lab-line); border-radius: var(--lab-radius); }
+.race-heading { padding: 18px 22px; }
+.race-heading h2 { font-size: 22px; font-weight: 650; color: var(--lab-ink); }
+.race-heading-actions { display: flex; align-items: center; gap: 12px; }
+.quick-start { width: 130px; height: 38px !important; padding: 0 12px !important; font-size: 12px !important; }
+.race-heading .eyebrow { font-size: 9px; color: var(--lab-muted); }
+.mode-tag { color: var(--lab-action); background: #fff0e8; border-color: #efcfbd; font-size: 8px; padding: 7px; }
+.game-view { height: clamp(420px, 52vh, 620px); }
+.hud { background: #141d23ed; border-color: #566269; color: var(--lab-night-text); gap: 24px; }
+.hud small, .hud em { color: var(--lab-night-muted); }
+.hud strong { font-size: 18px; }
+.ready-label { background: #141d23ed; color: var(--lab-night-text); border-color: #657178; left: auto; right: 18px; transform: none; }
+.ready-label small { color: var(--lab-night-muted); }
+.track-bottom > span, .speed { background: #141d23ed; color: var(--lab-night-text); border-color: #657178; }
+.speed small { color: var(--lab-night-muted); }
+.game-overlay { color: var(--lab-night-text); background: #141d23f2; }
+.game-overlay p, .game-overlay .eyebrow { color: var(--lab-night-muted); }
+.game-overlay > svg, .result-time { color: var(--lab-orange); }
+.countdown { color: var(--lab-orange); text-shadow: 0 4px 0 var(--lab-night); }
+.fleet-caption { color: var(--lab-night-text); border-color: #657178; }
+.race-footer { color: var(--lab-ink); border-top: 1px solid var(--lab-line); }
+.page-footer { color: var(--lab-muted); margin-bottom: 42px; }
+.page-footer a { display: flex; align-items: center; gap: 8px; color: var(--lab-ink); font-weight: 650; text-decoration: none; }
+.debug-dock { position: relative; top: auto; bottom: auto; right: auto; width: max-content; margin: 0 0 16px auto; box-shadow: none; border-color: var(--lab-line); }
+.debug-dock.is-open { position: fixed; bottom: 16px; right: 16px; margin: 0; box-shadow: 0 6px 24px #141d2320; }
+.debug-fold { background: var(--lab-night); color: var(--lab-night-text); padding: 11px 15px; font-size: 12px; }
+.debug-fold small { color: var(--lab-night-muted); }
+.debug-content { max-height: min(720px, calc(100dvh - 110px)); }
+.sensor-front, .sensor-table .sensor-front { color: #426518; }
+.sensor-rear { color: #176d94; }
+.debug-dock .sensor-debug { background: var(--lab-surface); }
+.training-lab { padding: 22px; }
+.training-lab .train-button { color: white; }
+.training-lab .training-actions button { border-color: var(--lab-line); }
+.training-lab .lab-tabs [data-active] { color: white; }
+.training-lab input[type=checkbox] { accent-color: var(--lab-action); }
+.touch-controls button { background: #141d23ed; color: white; border-color: #8d9b9e; width: 42px; height: 44px; }
+
+@media(max-width:1100px) {
+  .app-shell, .app-shell.debug-open { padding: 0 24px; }
+  .workspace, .debug-open .workspace { grid-template-columns: 240px minmax(0,1fr); gap: 24px; }
+  .project-hero { grid-template-columns: 1fr 300px; }
+  .product-name { display: none; }
+  .hud { gap: 16px; }
+  .hud strong { font-size: 16px; }
+}
+@media(max-width:760px) {
+  .app-shell, .app-shell.debug-open { padding: 0 16px; }
+  .topbar { height: 76px; }
+  .brand img { width: 174px; }
+  .topbar nav { gap: 0; font-size: 11px; }
+  .topbar nav a:last-child { display: none; }
+  .project-hero { grid-template-columns: 1fr 115px; gap: 12px; padding: 22px 20px; margin-top: 16px; }
+  .project-hero .eyebrow { font-size: 8px; line-height: 1.6; letter-spacing: 1px; }
+  .project-hero h1 { font-size: 32px; letter-spacing: -1.2px; }
+  .project-hero p { font-size: 11px; }
+  .hero-details { font-size: 9px; gap: 8px; }
+  .hero-details span + span::before { display: none; }
+  .hero-details span:last-child { display: none; }
+  .hero-art img { height: 155px; object-position: center; }
+  .hero-art figcaption { display: none; }
+  .workspace, .debug-open .workspace { display: flex; flex-direction: column; padding: 24px 0; gap: 24px; }
+  .setup { min-width: 0; width: 100%; }
+  .setup h2 { font-size: 23px; }
+  .driver-mode { margin: 16px 0 20px; }
+  .tracks { display: flex; gap: 8px; overflow-x: auto; padding: 1px 1px 9px; scroll-snap-type: x proximity; }
+  .track-option { flex: 0 0 130px; height: 89px !important; flex-direction: column !important; padding: 10px 5px !important; gap: 4px !important; scroll-snap-align: start; }
+  .track-copy strong { font-size: 11px; }
+  .track-copy small { font-size: 8px; }
+  .race-panel { width: 100%; }
+  .race-heading { padding: 16px; }
+  .game-view { height: 420px; }
+  .hud { gap: 18px; }
+  .hud strong { font-size: 14px; }
+  .hud small { font-size: 8px; }
+  .speed strong { font-size: 23px; }
+  .speed small { font-size: 8px; }
+  .ready-label { top: 82px; bottom: auto; left: 12px; right: 12px; }
+  .touch-controls { bottom: 15px; gap: 4px; }
+  .race-footer { font-size: 8px; }
+  .training-lab { padding: 18px 14px; }
+  .page-footer span:nth-child(2) { font-size: 10px; }
+}
+@media(max-width:390px) {
+  .project-hero { grid-template-columns: 1fr 82px; padding: 20px 16px; }
+  .project-hero h1 { font-size: 28px; }
+  .hero-art img { height: 144px; }
+  .hud { gap: 12px; padding: 10px; }
+  .hud strong { font-size: 12px; }
+  .touch-controls { left: 12px; transform: none; }
+  .touch-controls button { width: 38px; }
+  .ready-label { white-space: normal; width: auto; }
+}
+@media(hover:none) and (min-width:761px) {
+  .touch-controls { display: flex; position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); gap: 6px; }
+}
+@media(prefers-reduced-motion:reduce) { html { scroll-behavior: auto; } }

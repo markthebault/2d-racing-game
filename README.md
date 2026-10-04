@@ -2,14 +2,16 @@
 
 A small top-down racing game built with Three.js. Drive it yourself, or watch a neural network learn to race. Five circuits, 1–10 laps, all in your browser.
 
-![Pocket Circuit showing the Park Oval track, ray sensors, and circuit selection menu](docs/images/pocket-circuit.png)
+Play at [circuit.mthracelab.com](https://circuit.mthracelab.com/). Part of [MTH Race Lab](https://mthracelab.com/), using its shared logo, Inter typeface, off-white/slate surfaces and orange accents. The project cover is a [generated illustration with a recorded prompt](docs/project-artwork.md).
+
+![Pocket Circuit in the MTH Race Lab style, with the Park Oval track and circuit selection](docs/previews/desktop.png)
 
 ## Run the simulation
 
 Use Node.js 22.13 or newer and a browser with WebGL enabled.
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
@@ -20,6 +22,21 @@ Open the local URL printed in your terminal. Choose a circuit and lap count.
 - Choose **Fastest** to collect attempts faster, then **Run best model** to watch it drive in real time. **Pause all** pauses learning and playback.
 
 Training runs locally with TensorFlow.js on the CPU in a browser worker. No Python server or API key needed. Saved model weights stay in your browser; refreshing ends the live training session.
+
+## Build, check and deploy
+
+```sh
+npm run build
+npm test
+npm run test:pages
+npm run preview
+```
+
+The Vite build writes a static site to `dist`, including the AI training worker. `test:pages` checks that built site in installed Chrome: all five circuits, keyboard and touch controls, pause/reset, sensor tools, real worker training, and mobile layouts. Set `RACING_BROWSER_CHANNEL=chromium` to use Playwright Chromium, or `RACING_URL` to check the live site. Preview captures go to `docs/previews`. The existing worker regression scripts read the bundled worker from `dist/assets`.
+
+Cloudflare Pages project: `pocket-circuit`. Connected repository: `markthebault/2d-racing-game`. Pushes to `main` deploy automatically with build command `npm run build`, output `dist`, repository root and no framework preset. `.node-version` pins Node 22.16.0 for Cloudflare and CI. Custom domain: `circuit.mthracelab.com`; Pages address: `pocket-circuit.pages.dev`.
+
+Hosting uses the free static Pages service. There are no Pages Functions, server Workers, databases, or paid bindings. The browser Web Worker runs on the visitor's device. Credentials remain outside the repository, and changing hosting origins gives each origin its own browser-local model storage.
 
 ## Training input controls
 

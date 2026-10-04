@@ -3,17 +3,17 @@ import { readdir, readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
-const folder = resolve('dist/client/_next/static');
+const folder = resolve('dist/assets');
 const file = (await readdir(folder)).find((name) =>
   /^training\.worker-.*\.js$/.test(name),
 );
 assert.ok(file, 'Training worker must be included in the build');
-const chunks = await readdir(resolve(folder, 'chunks'));
+const chunks = await readdir(folder);
 const page = (
   await Promise.all(
     chunks
-      .filter((name) => /^page-.*\.js$/.test(name))
-      .map((name) => readFile(resolve(folder, 'chunks', name), 'utf8')),
+      .filter((name) => /^index-.*\.js$/.test(name))
+      .map((name) => readFile(resolve(folder, name), 'utf8')),
   )
 ).join('\n');
 const constructor = page.match(/new Worker\(new URL\([^)]*\)/)?.[0];

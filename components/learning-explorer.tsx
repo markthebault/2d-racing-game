@@ -192,7 +192,7 @@ function RoadView({ reading }: { reading: DecisionReading }) {
             y1={ray.origin.z}
             x2={ray.end.x}
             y2={ray.end.z}
-            stroke={i < 9 ? '#daef8c' : '#80d9ef'}
+            stroke={i < 9 ? '#bd4000' : '#176d94'}
             strokeWidth=".45"
             opacity=".85"
           />

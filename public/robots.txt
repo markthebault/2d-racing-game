@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://circuit.mthracelab.com/sitemap.xml
