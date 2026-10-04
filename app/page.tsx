@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Flag, ArrowUpRight, RotateCcw, Pause, Play, ChevronLeft, ChevronRight, Trophy, Keyboard } from 'lucide-react';
+import { Flag, ArrowUpRight, RotateCcw, Pause, Play, ChevronLeft, ChevronRight, Trophy, Keyboard, Camera, Map, Orbit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TRACKS, trackCurve, trackBounds, formatTime } from '@/lib/race';
 import { RaceEngine, type RaceStats } from '@/lib/engine';
@@ -9,13 +9,16 @@ import { SensorDebug } from '@/components/sensor-debug';
 import { TrainingLab, type TrainingControls } from '@/components/training-lab';
 import { vehicleTelemetry } from '@/lib/telemetry';
 import type { FleetFrame } from '@/lib/rl/batch';
+import { CAMERA_VIEWS, type CameraView } from '@/lib/race-camera';
 
 const TRACK_PREVIEWS = TRACKS.map((_, index) => {
   const points = trackCurve(index).getPoints(240);
   const bounds = trackBounds(points, 8);
   return {
-    viewBox: [bounds.minX, bounds.minZ, bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ].join(' '),
-    path: points.map((point, i) => (i ? 'L' : 'M') + point.x + ',' + point.z).join(' ') + ' Z',
+    // Workerd and browser trig can differ in the final floating-point digits.
+    // SVGs need pixel precision, and stable text during React hydration.
+    viewBox: [bounds.minX, bounds.minZ, bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ].map(value=>value.toFixed(3)).join(' '),
+    path: points.map((point, i) => (i ? 'L' : 'M') + point.x.toFixed(3) + ',' + point.z.toFixed(3)).join(' ') + ' Z',
   };
 });
 
@@ -32,14 +35,16 @@ export default function Home() {
   const [error,setError] = useState('');
   const [showRays,setShowRays] = useState(true);
   const [debugOpen,setDebugOpen] = useState(true);
+  const [cameraView,setCameraView] = useState<CameraView>('top');
   const [stats,setStats] = useState<RaceStats>({status:'ready',speed:0,lap:0,time:0,best:0,countdown:3,offroad:false,rays:[],vehicle:vehicleTelemetry()});
   useEffect(() => {
     if (!host.current) return;
-    try { engine.current = new RaceEngine(host.current, track, laps, setStats); engine.current.setExternal(learning); }
+    try { engine.current = new RaceEngine(host.current, track, laps, setStats); engine.current.setExternal(learning); queueMicrotask(()=>setError('')); }
     catch { setError('The game needs WebGL. Try a browser with hardware acceleration enabled.'); }
     return () => { engine.current?.dispose(); engine.current=null; };
   },[track,laps,learning]);
   useEffect(() => { engine.current?.setRaysVisible(showRays); },[showRays,track,laps,learning]);
+  useEffect(() => { engine.current?.setCameraView(cameraView); },[cameraView,track,laps,learning]);
   const running = stats.status !== 'ready' && stats.status !== 'finished';
   return <main className={"app-shell" + (debugOpen ? " debug-open" : "") + (learning ? " learning-mode" : "")}>
     <header className="topbar"><a className="brand" href="/" aria-label="Pocket Circuit home"><span className="brand-mark"><Flag size={21}/></span>POCKET<span>CIRCUIT</span><sup>01</sup></a><div className="top-note"><span className="live-dot"/> SINGLE PLAYER <span className="divider">/</span> TIME ATTACK</div></header>
@@ -61,7 +66,16 @@ export default function Home() {
       </aside>
       <section className="race-panel" aria-label="Race track">
         <div className="race-heading"><div><span className="eyebrow">CIRCUIT 0{track+1}</span><h2>{TRACKS[track].name}</h2></div><span className="mode-tag">{learning?'AI DRIVING LAB':stats.status==='ready'?'READY TO RACE':stats.status==='finished'?'CHECKERED FLAG':'TIME ATTACK'}</span></div>
+        <div className="camera-toolbar">
+          <fieldset className="camera-views" aria-label="Camera view">{CAMERA_VIEWS.map(view=>{
+            const Icon=view.id==='top'?Map:view.id==='chase'?Camera:Orbit;
+            return <Button key={view.id} variant="ghost" aria-pressed={cameraView===view.id} onClick={()=>setCameraView(view.id)}><Icon size={15}/>{view.label}</Button>;
+          })}</fieldset>
+          <Button variant="ghost" className="camera-rays" aria-pressed={showRays} onClick={()=>setShowRays(value=>!value)}>Sensor rays <span className="ray-status"/></Button>
+        </div>
         <div className="game-view"><div ref={host} className="canvas-host"/>
+          {cameraView==='chase'&&((!learning&&stats.status!=='ready')||(learning&&singlePlayback))&&<div className="chase-map" aria-label="Car position on circuit"><svg viewBox={TRACK_PREVIEWS[track].viewBox} aria-hidden="true"><path d={TRACK_PREVIEWS[track].path} fill="none" stroke="#b8c4b1" strokeWidth="3"/><circle cx={stats.vehicle.position.x} cy={stats.vehicle.position.z} r="3" fill="#ff765b" stroke="#fff1cf" strokeWidth="1"/></svg><span>CIRCUIT MAP</span></div>}
+          {cameraView==='chase'&&learning&&!singlePlayback&&<div className="camera-note">Whole-circuit view during fleet replays. Chase follows the best model.</div>}
           {(!learning || singlePlayback) && <div className="hud"><div><small>LAP</small><strong>{Math.min(stats.lap+1,laps)}<em> / {laps}</em></strong></div><div><small>RACE TIME</small><strong>{formatTime(stats.time)}</strong></div><div><small>BEST LAP</small><strong>{stats.best?formatTime(stats.best):'--:--.--'}</strong></div></div>}
           {learning&&!singlePlayback&&<div className="fleet-caption">{fleet&&fleet.track===track ? `EPISODES ${fleet.first}–${fleet.last} · ${fleet.poses.filter(p=>!p.done).length}/${fleet.poses.length} DRIVING · ${fleet.time.toFixed(1)} s · ${fleet.speed}× REPLAY` : 'LEARNING LAB · Cars appear together after each group of 50 attempts'}</div>}
           {!learning&&stats.status==='ready'&&<div className="ready-label"><span className="live-dot"/> ON THE GRID <small>Choose your laps, then start your engine.</small></div>}

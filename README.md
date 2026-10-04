@@ -16,10 +16,22 @@ npm run dev
 Open the local URL printed in your terminal. Choose a circuit and lap count.
 
 - Drive with the arrow keys. Escape pauses; R puts the car back on the track.
+- Switch between **2D top**, **3D chase**, and **3D overhead** above the circuit. Chase follows the formula car; overhead shows the entire circuit from far above. Camera changes preserve race and training progress. Fleet replays use the whole-circuit camera until a single best-model car appears. **Sensor rays** toggles the drawings without changing the AI's inputs.
 - Choose **Train AI → Start training** to teach the car. The default trains one model across Park Oval, Pine Bend and Desert Switchback.
 - Choose **Fastest** to collect attempts faster, then **Run best model** to watch it drive in real time. **Pause all** pauses learning and playback.
 
 Training runs locally with TensorFlow.js on the CPU in a browser worker. No Python server or API key needed. Saved model weights stay in your browser; refreshing ends the live training session.
+
+[Watch the browser demo of the 3D views and real trained-model playback](docs/videos/3d-racing-demo.mp4).
+
+Camera and training checks against a production preview:
+
+```sh
+node --test tests/camera.test.mjs
+RACING_URL=http://localhost:8090 node scripts/3d-browser.mjs
+```
+
+The browser check covers every circuit and view, mobile sizing, manual controls, real guided training, fifteen three-lap evaluation starts, fleet replays from a separate fresh trial-and-error session, and pause/reset during model playback. It saves screenshots and a trained checkpoint under `outputs/3d-validation`. Set `TRAINED_MODEL` to an existing checkpoint file to retest loading and continued learning without repeating warm-up. With FFmpeg available, `node scripts/record-3d-demo.mjs` records that checkpoint driving through the real UI and creates the demo above (`RACING_URL` and `FFMPEG_PATH` can override the defaults).
 
 ## Training input controls
 

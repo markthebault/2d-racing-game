@@ -152,7 +152,7 @@ function TrainingSession({ track, laps, config, onFrame, onFleet, onSave, models
       <Button className="train-button" disabled={unavailable} onClick={() => command({ type: busy ? 'pause' : 'resume' })}>{busy ? <Pause size={16}/> : <Play size={16}/>} {busy ? 'Pause all' : stats.pausedActivity === 'batch' || stats.pausedActivity === 'play' || stats.pausedActivity === 'coach' ? 'Resume all' : stats.steps ? 'Resume training' : 'Start training'}</Button>
       {stats.pausedActivity === 'play' && stats.status === 'paused' && <Button variant="outline" onClick={() => command({ type: 'train' })}>Return to training</Button>}
       <Button variant="outline" disabled={!stats.best || unavailable || stats.status === 'playing'} onClick={() => command({ type: 'play' })}><Play size={16}/> Run best model</Button>
-      <label>Training speed<select value={speed} onChange={e => { const next = Number(e.target.value); setSpeed(next); command({ type: 'speed', speed: next }); }}><option value={1}>1×</option><option value={4}>4×</option><option value={20}>20×</option><option value={0}>Fastest</option></select></label>
+      <label>Training speed<select aria-label="Training speed" value={speed} onChange={e => { const next = Number(e.target.value); setSpeed(next); command({ type: 'speed', speed: next }); }}><option value={1}>1×</option><option value={4}>4×</option><option value={20}>20×</option><option value={0}>Fastest</option></select></label>
     </div>
     <TabsList className="lab-tabs" aria-label="AI workspace">
       <TabsTrigger value="train">Train</TabsTrigger>
